@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "base-template",
+    "slug": "base-template",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "base-template",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#131F24"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
