@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
+import { setPendingResult } from "@/utils/resultsStore";
 import type { Sentence } from "@/data/types";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -229,6 +230,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
     gameState,
     submitAnswer,
     stars,
+    results,
   } = useGameEngine({ level, subLevel });
 
   // Hold last sentence visible during the result-animation delay
@@ -275,6 +277,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
   // ── Navigate when finished ──────────────────────────────────────────────────
   useEffect(() => {
     if (gameState === "finished") {
+      setPendingResult({ level, subLevel, score, stars, results });
       router.replace({
         pathname: "/results",
         params: {
@@ -418,7 +421,10 @@ function GameRound({ level, subLevel }: GameRoundProps) {
 // given level. If all 5 subLevels are complete, replays from subLevel 1.
 
 export default function GameScreen() {
-  const { level: levelParam } = useLocalSearchParams<{ level: string }>();
+  const { level: levelParam, subLevel: subLevelParam } = useLocalSearchParams<{
+    level: string;
+    subLevel?: string;
+  }>();
   const level = Math.max(1, Math.min(4, parseInt(levelParam ?? "1", 10))) as
     | 1 | 2 | 3 | 4;
 
@@ -433,9 +439,13 @@ export default function GameScreen() {
     );
   }
 
-  const records = getLevelProgress(level);
-  const subLevel = (records.find((r) => !r.completed)?.subLevel ?? 1) as
-    | 1 | 2 | 3 | 4 | 5;
+  let subLevel: 1 | 2 | 3 | 4 | 5;
+  if (subLevelParam !== undefined) {
+    subLevel = Math.max(1, Math.min(5, parseInt(subLevelParam, 10))) as 1 | 2 | 3 | 4 | 5;
+  } else {
+    const records = getLevelProgress(level);
+    subLevel = (records.find((r) => !r.completed)?.subLevel ?? 1) as 1 | 2 | 3 | 4 | 5;
+  }
 
   return <GameRound level={level} subLevel={subLevel} />;
 }
