@@ -1,13 +1,21 @@
+import { useEffect } from "react";
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { useProgress, type SubLevelRecord } from "@/hooks/useProgress";
+import { useStreak } from "@/hooks/useStreak";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
-
-const MOCK_STREAK = 7;
 
 interface LevelDef {
   level: 1 | 2 | 3 | 4;
@@ -182,6 +190,27 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
 export default function HomeScreen() {
   const router = useRouter();
   const { getLevelProgress, isLevelUnlocked } = useProgress();
+  const { currentStreak } = useStreak();
+
+  // ── Flame pulse — subtle scale breathe when streak is active ────────────────
+  const flameScale = useSharedValue(1);
+  const flameStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: flameScale.value }],
+  }));
+
+  useEffect(() => {
+    if (currentStreak > 0) {
+      flameScale.value = withRepeat(
+        withSequence(
+          withTiming(1.22, { duration: 650 }),
+          withTiming(1.0,  { duration: 650 }),
+        ),
+        -1, // infinite
+      );
+    } else {
+      flameScale.value = withTiming(1, { duration: 300 });
+    }
+  }, [currentStreak]);
 
   const handleCardPress = (level: 1 | 2 | 3 | 4) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -215,8 +244,9 @@ export default function HomeScreen() {
               className="flex-row items-center bg-surface px-4 py-2.5 rounded-2xl"
               style={styles.streakBadge}
             >
-              <Text style={{ fontSize: 20 }}>🔥</Text>
-              <Text style={styles.streakText}>{MOCK_STREAK}</Text>
+              <Animated.Text style={[styles.streakFlame, flameStyle]}>🔥</Animated.Text>
+              <Text style={styles.streakLabel}>Tag </Text>
+              <Text style={styles.streakNum}>{currentStreak}</Text>
             </Animated.View>
           </View>
 
@@ -259,11 +289,20 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#FF9600",
   },
-  streakText: {
+  streakFlame: {
+    fontSize: 20,
+  },
+  streakLabel: {
     color: "#FF9600",
-    fontWeight: "800",
+    fontWeight: "700",
+    fontSize: 13,
+    marginLeft: 6,
+    marginTop: 1, // optical alignment
+  },
+  streakNum: {
+    color: "#FF9600",
+    fontWeight: "900",
     fontSize: 18,
-    marginLeft: 5,
   },
   cardShadow: {
     shadowOffset: { width: 0, height: 6 },
