@@ -22,7 +22,7 @@ module.exports = {
         warning: "#FFC800",   // Yellow/Gold — warnings, coins, gems
 
         // ─── Surfaces & text ─────────────────────────────────────────────
-        background: "#131F24", // Dark navy — main app background
+        background: "#001d3d", // Deep navy — main app background
         surface: "#1A2E35",    // Slightly lighter — cards, modals, inputs
 
         // Text colors (use as text-foreground, text-muted)

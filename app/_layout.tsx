@@ -56,7 +56,7 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           // Default header style — matches the dark palette
-          headerStyle: { backgroundColor: "#131F24" },
+          headerStyle: { backgroundColor: "#001d3d" },
           headerTintColor: "#FFFFFF",
           headerTitleStyle: { fontWeight: "bold" },
           // Uncomment to hide headers globally and control per-screen:
