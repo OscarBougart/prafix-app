@@ -13,6 +13,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
+import { FontAwesome6 } from "@expo/vector-icons";
 import { useProgress, type SubLevelRecord } from "@/hooks/useProgress";
 import { useStreak } from "@/hooks/useStreak";
 import { useSound } from "@/hooks/useSound";
@@ -32,8 +34,8 @@ const LEVEL_DEFS: LevelDef[] = [
     level: 1,
     cefr: "A1",
     description: "Einfache Verben im Präsens",
-    accent: "#58CC02",
-    accentDark: "#46A302",
+    accent: "#D4A800",
+    accentDark: "#B08E00",
   },
   {
     level: 2,
@@ -72,11 +74,12 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
   const completedCount = records.filter((r) => r.completed).length;
   const totalStars = records.reduce((sum, r) => sum + r.bestStars, 0);
   const progressPct: `${number}%` = `${(completedCount / 5) * 100}%`;
+  const dimmed = !unlocked;
 
   return (
     <Animated.View
       entering={FadeInDown.delay(animationIndex * 130).duration(500)}
-      className="mb-5"
+      style={{ marginBottom: 14 }}
     >
       <Pressable
         onPress={onPress}
@@ -84,104 +87,69 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
         accessibilityLabel={`Level ${def.level} ${def.cefr}: ${def.description}`}
         accessibilityRole="button"
         accessibilityState={{ disabled: !unlocked }}
-        style={[styles.cardShadow, { shadowColor: def.accent }]}
-        className="rounded-2xl"
+        style={[
+          styles.cardShadow,
+          { shadowColor: dimmed ? "#000" : def.accent },
+          {
+            backgroundColor: dimmed ? "#1A2430" : def.accent,
+            borderRadius: 18,
+            borderBottomWidth: 5,
+            borderBottomColor: dimmed ? "#111820" : def.accentDark,
+          },
+        ]}
       >
-        {/* ── Card body ── */}
-        <View className="bg-surface rounded-2xl overflow-hidden">
+        <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 14 }}>
 
-          {/* Accent top strip */}
-          <View style={{ height: 5, backgroundColor: def.accent }} />
-
-          {/* Content */}
-          <View className="px-4 pt-4 pb-5">
-
-            {/* Title row */}
-            <View className="flex-row items-center mb-3">
-
-              {/* Numbered badge */}
-              <View
-                style={{
-                  backgroundColor: def.accent,
-                  width: 46,
-                  height: 46,
-                  borderRadius: 23,
-                  borderBottomWidth: 3,
-                  borderBottomColor: def.accentDark,
-                }}
-                className="items-center justify-center mr-3"
-              >
-                <Text style={{ color: "#001d3d", fontSize: 20, fontWeight: "900" }}>
-                  {def.level}
+          {/* Title row */}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 10 }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={[styles.cardTitle, { color: dimmed ? "#4A6070" : "#001d3d" }]}>
+                  Level {def.level}
                 </Text>
+                {dimmed && <Ionicons name="lock-closed" size={14} color="#4A6070" />}
+
+                {/* Stars — inline with title, pushed to the right */}
+                <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end", gap: 3 }}>
+                  {[1, 2, 3].map((i) => (
+                    <Text
+                      key={i}
+                      style={{
+                        fontSize: 18,
+                        color: dimmed ? "#3A5060" : totalStars >= i * 5 ? "#001d3d" : "rgba(0,29,61,0.3)",
+                      }}
+                    >
+                      ★
+                    </Text>
+                  ))}
+                </View>
               </View>
-
-              {/* Level title + description */}
-              <View className="flex-1">
-                <Text className="text-foreground text-base leading-tight" style={{ fontFamily: "Nunito_700Bold" }}>
-                  Level {def.level} — {def.cefr}
-                </Text>
-                <Text className="text-muted text-sm mt-0.5" style={{ fontFamily: "Nunito_400Regular" }}>
-                  {def.description}
-                </Text>
-              </View>
-
-              {/* Stars total */}
-              <View className="items-end ml-2">
-                <Text style={{ fontFamily: "GravitasOne_400Regular", color: def.accent, fontSize: 16 }}>
-                  {totalStars}
-                </Text>
-                <Text style={{ fontFamily: "Nunito_400Regular", color: "#AFAFAF", fontSize: 11 }}>
-                  / 15 ⭐
-                </Text>
-              </View>
+              <Text style={[styles.cardCefr, { color: dimmed ? "#3A5060" : "rgba(0,29,61,0.75)" }]}>
+                {def.cefr}
+              </Text>
+              <Text style={[styles.cardDesc, { color: dimmed ? "#3A5060" : "rgba(0,29,61,0.65)" }]}>
+                {def.description}
+              </Text>
             </View>
+          </View>
 
-            {/* Progress bar track */}
-            <View className="h-2.5 bg-border rounded-full mb-4">
+          {/* Progress bar + counter */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={[styles.progressTrack, { backgroundColor: dimmed ? "#111820" : "rgba(0,29,61,0.2)" }]}>
               <View
                 style={{
                   width: progressPct,
                   height: "100%",
-                  backgroundColor: def.accent,
+                  backgroundColor: dimmed ? "#2C4551" : "rgba(0,29,61,0.5)",
                   borderRadius: 999,
                 }}
               />
             </View>
-
-            {/* SubLevel stars — one star per subLevel, filled when completed */}
-            <View className="flex-row justify-around">
-              {records.map((record) => (
-                <View key={record.subLevel} className="items-center gap-0.5">
-                  <Text
-                    style={{
-                      fontSize: 22,
-                      color: record.completed ? def.accent : "#2C4551",
-                    }}
-                  >
-                    ★
-                  </Text>
-                  <Text style={{ fontFamily: "Nunito_400Regular", color: "#AFAFAF", fontSize: 10 }}>
-                    {record.subLevel}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* ── Lock overlay ── */}
-        {!unlocked && (
-          <View
-            className="absolute inset-0 rounded-2xl items-center justify-center"
-            style={{ backgroundColor: "rgba(0, 10, 30, 0.72)" }}
-          >
-            <Text style={{ fontSize: 38 }}>🔒</Text>
-            <Text className="text-muted text-sm mt-2" style={{ fontFamily: "Nunito_700Bold" }}>
-              Schließ Level {def.level - 1} ab
+            <Text style={[styles.progressLabel, { color: dimmed ? "#3A5060" : "rgba(0,29,61,0.7)" }]}>
+              {completedCount}/5
             </Text>
           </View>
-        )}
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -261,16 +229,18 @@ export default function HomeScreen() {
                 accessibilityLabel="Profil öffnen"
                 style={styles.iconBtn}
               >
-                <Text style={styles.iconBtnText}>👤</Text>
+                <Ionicons name="person" size={22} color="#1CB0F6" />
               </Pressable>
             </View>
 
             {/* Center: Streak badge */}
             <View style={styles.topBarCenter}>
-              <View style={[styles.streakBadge, { backgroundColor: "#1A2E35" }]}>
-                <Animated.Text style={[styles.streakFlame, flameStyle]}>🔥</Animated.Text>
-                <Text style={styles.streakLabel}>Tag </Text>
+              <View style={styles.streakBadge}>
+                <Animated.View style={flameStyle}>
+                  <FontAwesome6 name="fire" size={20} color="#FF9600" />
+                </Animated.View>
                 <Text style={styles.streakNum}>{currentStreak}</Text>
+                <Text style={styles.streakLabel}>{currentStreak === 1 ? "Tag" : "Tage"}</Text>
               </View>
             </View>
 
@@ -282,7 +252,7 @@ export default function HomeScreen() {
                 accessibilityLabel="Einstellungen öffnen"
                 style={styles.iconBtn}
               >
-                <Text style={styles.iconBtnText}>⚙️</Text>
+                <Ionicons name="settings" size={22} color="#1CB0F6" />
               </Pressable>
             </View>
           </Animated.View>
@@ -341,13 +311,15 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1A2E35",
-    borderRadius: 12,
+    backgroundColor: "#0A2A4A",
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: "#2C4551",
-  },
-  iconBtnText: {
-    fontSize: 18,
+    shadowColor: "#0A8FCF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
   titleText: {
     fontFamily: "GravitasOne_400Regular",
@@ -359,31 +331,70 @@ const styles = StyleSheet.create({
   streakBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
+    gap: 10,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#FF9600",
-  },
-  streakFlame: {
-    fontSize: 20,
+    borderRadius: 999,
+    backgroundColor: "#1A2E35",
   },
   streakLabel: {
     fontFamily: "Nunito_700Bold",
     color: "#FF9600",
-    fontSize: 13,
-    marginLeft: 6,
-    marginTop: 1,
+    fontSize: 14  ,
   },
   streakNum: {
     fontFamily: "GravitasOne_400Regular",
     color: "#FF9600",
     fontSize: 18,
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   cardShadow: {
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
+  },
+  card: {
+    flexDirection: "row",
+    backgroundColor: "#1A2E35",
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  cardDimmed: {
+    backgroundColor: "#111E24",
+  },
+  cardTitle: {
+    fontFamily: "GravitasOne_400Regular",
+    color: "#FFFFFF",
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  cardCefr: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 14,
+    marginTop: 2,
+  },
+  cardDesc: {
+    fontFamily: "Nunito_400Regular",
+    fontSize: 13,
+    marginTop: 1,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 7,
+    backgroundColor: "#2C4551",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  progressLabel: {
+    fontFamily: "Nunito_700Bold",
+    color: "#AFAFAF",
+    fontSize: 12,
+    minWidth: 24,
+    textAlign: "right",
+  },
+  textDimmed: {
+    color: "#5A7080",
   },
 });
