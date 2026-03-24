@@ -13,15 +13,15 @@ import type { Sentence } from "./types";
 const aufmachenL1: Sentence[] = [
   {
     id: "s001", verbInfinitive: "aufmachen", tense: "praesens", level: 1, subLevel: 1,
-    template: "Ich _____ die Tür _____.",
+    template: "Ich _____ die Tür weit _____ — es ist sehr heiß drinnen.",
     conjugatedStem: "mache", correctPrefix: "auf", distractors: ["zu", "an", "ab"],
-    translation: "I open the door.",
+    translation: "I open the door wide — it is very hot inside.",
   },
   {
     id: "s002", verbInfinitive: "aufmachen", tense: "praesens", level: 1, subLevel: 2,
-    template: "Er _____ das Fenster _____.",
+    template: "Er _____ das Fenster _____, weil es so stickig ist.",
     conjugatedStem: "macht", correctPrefix: "auf", distractors: ["zu", "an", "ab"],
-    translation: "He opens the window.",
+    translation: "He opens the window because it is so stuffy.",
   },
   {
     id: "s003", verbInfinitive: "aufmachen", tense: "praesens", level: 1, subLevel: 3,
@@ -47,15 +47,15 @@ const aufmachenL1: Sentence[] = [
 const zumachenL1: Sentence[] = [
   {
     id: "s006", verbInfinitive: "zumachen", tense: "praesens", level: 1, subLevel: 1,
-    template: "Ich _____ die Tür _____.",
+    template: "Ich _____ die Tür _____, damit es ruhig bleibt.",
     conjugatedStem: "mache", correctPrefix: "zu", distractors: ["auf", "an", "ab"],
-    translation: "I close the door.",
+    translation: "I close the door so that it stays quiet.",
   },
   {
     id: "s007", verbInfinitive: "zumachen", tense: "praesens", level: 1, subLevel: 2,
-    template: "Er _____ das Fenster _____.",
+    template: "Er _____ das Fenster _____, weil es draußen so laut ist.",
     conjugatedStem: "macht", correctPrefix: "zu", distractors: ["auf", "an", "ab"],
-    translation: "He closes the window.",
+    translation: "He closes the window because it is so loud outside.",
   },
   {
     id: "s008", verbInfinitive: "zumachen", tense: "praesens", level: 1, subLevel: 3,
@@ -115,9 +115,9 @@ const anfangenL1: Sentence[] = [
 const aufstehenL1: Sentence[] = [
   {
     id: "s016", verbInfinitive: "aufstehen", tense: "praesens", level: 1, subLevel: 1,
-    template: "Ich _____ jeden Morgen früh _____.",
+    template: "Ich _____ jeden Morgen um sechs Uhr früh _____.",
     conjugatedStem: "stehe", correctPrefix: "auf", distractors: ["an", "ab", "ein"],
-    translation: "I get up early every morning.",
+    translation: "I get up early at six o'clock every morning.",
   },
   {
     id: "s017", verbInfinitive: "aufstehen", tense: "praesens", level: 1, subLevel: 2,
@@ -357,9 +357,9 @@ const fernsehenL1: Sentence[] = [
 const ankommenL2: Sentence[] = [
   {
     id: "s051", verbInfinitive: "ankommen", tense: "praesens", level: 2, subLevel: 1,
-    template: "Der Zug _____ um 15 Uhr _____.",
+    template: "Der Zug aus München _____ um 15 Uhr in Berlin _____.",
     conjugatedStem: "kommt", correctPrefix: "an", distractors: ["ab", "auf", "mit"],
-    translation: "The train arrives at 3 pm.",
+    translation: "The train from Munich arrives in Berlin at 3 pm.",
   },
   {
     id: "s052", verbInfinitive: "ankommen", tense: "praesens", level: 2, subLevel: 2,
@@ -381,9 +381,9 @@ const ankommenL2: Sentence[] = [
   },
   {
     id: "s055", verbInfinitive: "ankommen", tense: "praesens", level: 2, subLevel: 5,
-    template: "Er _____ immer pünktlich _____.",
+    template: "Er _____ nach der Reise immer pünktlich _____.",
     conjugatedStem: "kommt", correctPrefix: "an", distractors: ["ab", "auf", "mit"],
-    translation: "He always arrives on time.",
+    translation: "He always arrives on time after the journey.",
   },
 ];
 
@@ -425,15 +425,15 @@ const abfahrenL2: Sentence[] = [
 const einladenL2: Sentence[] = [
   {
     id: "s061", verbInfinitive: "einladen", tense: "praesens", level: 2, subLevel: 1,
-    template: "Ich _____ meine Freunde _____.",
+    template: "Ich _____ meine Freunde zu meiner Geburtstagsparty _____.",
     conjugatedStem: "lade", correctPrefix: "ein", distractors: ["an", "auf", "vor"],
-    translation: "I invite my friends.",
+    translation: "I invite my friends to my birthday party.",
   },
   {
     id: "s062", verbInfinitive: "einladen", tense: "praesens", level: 2, subLevel: 2,
-    template: "Er _____ uns zum Abendessen _____.",
+    template: "Er _____ uns zu einem Abendessen bei ihm zu Hause _____.",
     conjugatedStem: "lädt", correctPrefix: "ein", distractors: ["an", "auf", "vor"],
-    translation: "He invites us to dinner.",
+    translation: "He invites us to a dinner at his home.",
   },
   {
     id: "s063", verbInfinitive: "einladen", tense: "praesens", level: 2, subLevel: 3,
@@ -527,9 +527,9 @@ const aufhoerenL2: Sentence[] = [
 const zurueckkommenL2: Sentence[] = [
   {
     id: "s076", verbInfinitive: "zurückkommen", tense: "praesens", level: 2, subLevel: 1,
-    template: "Ich _____ morgen _____.",
+    template: "Ich _____ morgen aus dem Urlaub _____.",
     conjugatedStem: "komme", correctPrefix: "zurück", distractors: ["an", "mit", "vor"],
-    translation: "I come back tomorrow.",
+    translation: "I come back from holiday tomorrow.",
   },
   {
     id: "s077", verbInfinitive: "zurückkommen", tense: "praesens", level: 2, subLevel: 2,
@@ -539,9 +539,9 @@ const zurueckkommenL2: Sentence[] = [
   },
   {
     id: "s078", verbInfinitive: "zurückkommen", tense: "praesens", level: 2, subLevel: 3,
-    template: "Wir _____ um Mitternacht _____.",
+    template: "Wir _____ erst um Mitternacht nach Hause _____.",
     conjugatedStem: "kommen", correctPrefix: "zurück", distractors: ["an", "mit", "vor"],
-    translation: "We come back at midnight.",
+    translation: "We don't come back home until midnight.",
   },
   {
     id: "s079", verbInfinitive: "zurückkommen", tense: "praesens", level: 2, subLevel: 4,
@@ -947,9 +947,9 @@ const zusammenarbeitenL3: Sentence[] = [
 const aufstehenL3: Sentence[] = [
   {
     id: "s136", verbInfinitive: "aufstehen", tense: "praesens", level: 3, subLevel: 1,
-    template: "Ich _____ heute sehr früh _____.",
+    template: "Ich _____ heute sehr früh _____, obwohl ich müde bin.",
     conjugatedStem: "stehe", correctPrefix: "auf", distractors: ["an", "ab", "ein"],
-    translation: "I get up very early today.",
+    translation: "I get up very early today, even though I am tired.",
   },
   {
     id: "s137", verbInfinitive: "aufstehen", tense: "praesens", level: 3, subLevel: 2,
@@ -960,9 +960,9 @@ const aufstehenL3: Sentence[] = [
   {
     id: "s138", verbInfinitive: "aufstehen", tense: "perfekt", level: 3, subLevel: 3,
     // sein auxiliary: "Ich bin ... aufgestanden"
-    template: "Ich bin heute sehr früh _____gestanden.",
+    template: "Ich bin heute sehr früh _____gestanden, weil mein Zug früh fährt.",
     conjugatedStem: "gestanden", correctPrefix: "auf", distractors: ["an", "ab", "ein"],
-    translation: "I got up very early today.",
+    translation: "I got up very early today because my train leaves early.",
   },
   {
     id: "s139", verbInfinitive: "aufstehen", tense: "perfekt", level: 3, subLevel: 4,
@@ -983,9 +983,9 @@ const aufstehenL3: Sentence[] = [
 const ankommenL3: Sentence[] = [
   {
     id: "s141", verbInfinitive: "ankommen", tense: "praesens", level: 3, subLevel: 1,
-    template: "Der Zug _____ immer pünktlich _____.",
+    template: "Der Zug _____ nach langer Fahrt immer pünktlich _____.",
     conjugatedStem: "kommt", correctPrefix: "an", distractors: ["ab", "auf", "mit"],
-    translation: "The train always arrives on time.",
+    translation: "The train always arrives on time after a long journey.",
   },
   {
     id: "s142", verbInfinitive: "ankommen", tense: "praesens", level: 3, subLevel: 2,
@@ -1018,15 +1018,15 @@ const ankommenL3: Sentence[] = [
 const einladenL3: Sentence[] = [
   {
     id: "s146", verbInfinitive: "einladen", tense: "praesens", level: 3, subLevel: 1,
-    template: "Ich _____ alle Freunde zur Feier _____.",
+    template: "Ich _____ alle Freunde herzlich zur Feier _____.",
     conjugatedStem: "lade", correctPrefix: "ein", distractors: ["an", "vor", "auf"],
-    translation: "I invite all friends to the celebration.",
+    translation: "I warmly invite all friends to the celebration.",
   },
   {
     id: "s147", verbInfinitive: "einladen", tense: "praesens", level: 3, subLevel: 2,
-    template: "Er _____ seine Kollegen zum Mittagessen _____.",
+    template: "Er _____ seine neuen Kollegen zum gemeinsamen Mittagessen _____.",
     conjugatedStem: "lädt", correctPrefix: "ein", distractors: ["an", "vor", "auf"],
-    translation: "He invites his colleagues to lunch.",
+    translation: "He invites his new colleagues to lunch together.",
   },
   {
     id: "s148", verbInfinitive: "einladen", tense: "perfekt", level: 3, subLevel: 3,

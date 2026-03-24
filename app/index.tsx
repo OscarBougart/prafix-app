@@ -93,8 +93,12 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
           {
             backgroundColor: dimmed ? "#1A2430" : def.accent,
             borderRadius: 18,
+            borderWidth: 3,
+            borderColor: dimmed ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.2)",
             borderBottomWidth: 5,
-            borderBottomColor: dimmed ? "#111820" : def.accentDark,
+            borderBottomColor: dimmed ? "rgba(0,0,0,0.3)" : def.accentDark,
+            borderTopWidth: 3,
+            borderTopColor: dimmed ? "rgba(0,0,0,0.12)" : "rgba(0,0,0,0.10)",
           },
         ]}
       >
@@ -331,7 +335,7 @@ const styles = StyleSheet.create({
   streakBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
@@ -348,6 +352,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlignVertical: "center",
     includeFontPadding: false,
+    marginRight: -4,
   },
   cardShadow: {
     shadowOffset: { width: 0, height: 6 },
@@ -379,7 +384,8 @@ const styles = StyleSheet.create({
     fontFamily: "Nunito_400Regular",
     fontSize: 13,
     marginTop: 1,
-  },
+    letterSpacing: 1.2,
+  }, 
   progressTrack: {
     flex: 1,
     height: 7,

@@ -138,9 +138,9 @@ function SentenceRow({ result, index }: SentenceRowProps) {
         {/* Wrong-answer detail */}
         {!correct && (
           <Text style={S.rowWrongLine}>
-            <Text style={{ color: C.wrong }}>{answeredPrefix}-</Text>
+            <Text style={{ color: C.wrong }}>{answeredPrefix}</Text>
             {"  →  "}
-            <Text style={{ color: C.correct }}>{sentence.correctPrefix}-</Text>
+            <Text style={{ color: C.correct }}>{sentence.correctPrefix}</Text>
           </Text>
         )}
       </View>

@@ -16,12 +16,12 @@ import Animated, {
   FadeInDown,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { MaterialIcons, Entypo } from "@expo/vector-icons";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
 import { useSound } from "@/hooks/useSound";
-import { useSettings } from "@/hooks/useSettings";
 import { setPendingResult } from "@/utils/resultsStore";
 import type { Sentence } from "@/data/types";
 
@@ -30,7 +30,7 @@ import type { Sentence } from "@/data/types";
 const { width: SCREEN_W } = Dimensions.get("window");
 const H_PAD = 20;
 const CLOSE_W = 40;
-const SCORE_W = 56;
+const SCORE_W = 68;
 const BAR_GAPS = 8 * 2; // gap on each side of the bar
 const PROGRESS_TRACK_W = SCREEN_W - H_PAD * 2 - CLOSE_W - SCORE_W - BAR_GAPS;
 
@@ -140,7 +140,7 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
           { backgroundColor: bgColor, borderBottomColor: borderColor, opacity },
         ]}
       >
-        <Text style={[S.optionBtnText, { color: labelColor }]}>{option}-</Text>
+        <Text style={[S.optionBtnText, { color: labelColor }]}>{option}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -168,7 +168,7 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
   const blankText =
     answer.phase === "idle"
       ? " ___ "
-      : ` ${answer.selectedPrefix}- `;
+      : ` ${answer.selectedPrefix} `;
 
   const blankColor =
     answer.phase === "idle"
@@ -256,7 +256,12 @@ function GameRound({ level, subLevel }: GameRoundProps) {
   // ── Answer state ────────────────────────────────────────────────────────────
   const [answer, setAnswer] = useState<AnswerState>(IDLE);
   const { playCorrect, playWrong } = useSound();
-  const { settings } = useSettings();
+
+  // ── Translation toggle — reset on each new sentence ─────────────────────────
+  const [showTranslation, setShowTranslation] = useState(false);
+  useEffect(() => {
+    setShowTranslation(false);
+  }, [currentSentence?.id]);
 
   // ── Animations ──────────────────────────────────────────────────────────────
 
@@ -365,15 +370,8 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         {/* Score badge */}
         <View style={S.scoreBadge}>
           <Text style={S.scoreNum}>{score}</Text>
-          <Text style={S.scoreStar}>⭐</Text>
+          <Entypo name="star" size={30} color={C.btnYellow} style={{ marginBottom: 6 }} />
         </View>
-      </View>
-
-      {/* ── Sentence counter ── */}
-      <View style={{ paddingHorizontal: H_PAD, paddingBottom: 8 }}>
-        <Text style={S.sentenceCounter}>
-          {sentenceIndex + 1} / {totalSentences}
-        </Text>
       </View>
 
       {/* ── Sentence card ── */}
@@ -381,16 +379,28 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         {/* Outer view owns the enter animation; inner view owns the scale transform. */}
         {/* Combining both on one Animated.View causes a Reanimated conflict warning. */}
         <Animated.View key={displayedSentence.id} entering={FadeInDown.duration(350).springify()}>
+          {/* Sentence counter — right-aligned above the card */}
+          <Text style={[S.sentenceCounter, { marginBottom: 6 }]}>
+            {sentenceIndex + 1} / {totalSentences}
+          </Text>
           <Animated.View style={[S.sentenceCard, cardStyle]}>
             <SentenceDisplay sentence={displayedSentence} answer={answer} />
-
-            {settings.showTranslation && (
-              <>
-                <View style={S.divider} />
-                <Text style={S.translationText}>{displayedSentence.translation}</Text>
-              </>
-            )}
           </Animated.View>
+
+          {/* Translate button + translation below card, right-aligned */}
+          <View style={S.translationRow}>
+            {showTranslation && (
+              <Text style={S.translationText}>{displayedSentence.translation}</Text>
+            )}
+            <Pressable
+              onPress={() => setShowTranslation((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel="Übersetzung umschalten"
+              hitSlop={8}
+            >
+              <MaterialIcons name="translate" size={24} color={showTranslation ? C.blue : C.muted} />
+            </Pressable>
+          </View>
         </Animated.View>
       </View>
 
@@ -501,7 +511,7 @@ const S = StyleSheet.create({
   },
   scoreNum: {
     color: C.foreground,
-    fontFamily: "GravitasOne_400Regular",
+    fontFamily: "Nunito_700Bold",
     fontSize: 18,
   },
   scoreStar: {
@@ -542,7 +552,6 @@ const S = StyleSheet.create({
     fontFamily: "Nunito_700Bold",
     color: C.stemColor,
     fontSize: 20,
-    backgroundColor: "rgba(28,176,246,0.14)",
   },
   // Stem text after prefix blank (Perfekt / Nebensatz)
   stemChipText: {
@@ -560,6 +569,14 @@ const S = StyleSheet.create({
     fontSize: 14,
     fontStyle: "italic",
     lineHeight: 20,
+  },
+  translationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 8,
+    paddingHorizontal: 4,
   },
 
   // Options
