@@ -118,20 +118,20 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
 
               {/* Level title + description */}
               <View className="flex-1">
-                <Text className="text-foreground font-bold text-base leading-tight">
+                <Text className="text-foreground text-base leading-tight" style={{ fontFamily: "Nunito_700Bold" }}>
                   Level {def.level} — {def.cefr}
                 </Text>
-                <Text className="text-muted text-sm mt-0.5">
+                <Text className="text-muted text-sm mt-0.5" style={{ fontFamily: "Nunito_400Regular" }}>
                   {def.description}
                 </Text>
               </View>
 
               {/* Stars total */}
               <View className="items-end ml-2">
-                <Text style={{ color: def.accent, fontSize: 16, fontWeight: "800" }}>
+                <Text style={{ fontFamily: "GravitasOne_400Regular", color: def.accent, fontSize: 16 }}>
                   {totalStars}
                 </Text>
-                <Text style={{ color: "#AFAFAF", fontSize: 11 }}>
+                <Text style={{ fontFamily: "Nunito_400Regular", color: "#AFAFAF", fontSize: 11 }}>
                   / 15 ⭐
                 </Text>
               </View>
@@ -161,7 +161,7 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
                   >
                     ★
                   </Text>
-                  <Text style={{ color: "#AFAFAF", fontSize: 10 }}>
+                  <Text style={{ fontFamily: "Nunito_400Regular", color: "#AFAFAF", fontSize: 10 }}>
                     {record.subLevel}
                   </Text>
                 </View>
@@ -177,7 +177,7 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
             style={{ backgroundColor: "rgba(0, 10, 30, 0.72)" }}
           >
             <Text style={{ fontSize: 38 }}>🔒</Text>
-            <Text className="text-muted text-sm mt-2 font-semibold">
+            <Text className="text-muted text-sm mt-2" style={{ fontFamily: "Nunito_700Bold" }}>
               Schließ Level {def.level - 1} ab
             </Text>
           </View>
@@ -194,7 +194,7 @@ export default function HomeScreen() {
   const { unlocked } = useLocalSearchParams<{ unlocked?: string }>();
   const { getLevelProgress, isLevelUnlocked, reloadProgress } = useProgress();
   const { currentStreak } = useStreak();
-  const { soundEnabled, toggleSound, playUnlock } = useSound();
+  const { playUnlock } = useSound();
 
   // ── Flame pulse — subtle scale breathe when streak is active ────────────────
   const flameScale = useSharedValue(1);
@@ -246,59 +246,58 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <View className="px-6 pt-5 pb-8">
+        <View className="px-6 pt-5 pb-6">
 
-          {/* Title row */}
-          <View className="flex-row items-center justify-between mb-1">
-
-            {/* App title — split color */}
-            <Animated.View entering={FadeIn.duration(600)}>
-              <Text style={styles.titleText}>
-                <Text style={{ color: "#1CB0F6" }}>Prä</Text>
-                <Text style={{ color: "#FFC800" }}>Fix</Text>
-              </Text>
-            </Animated.View>
-
-            {/* Right-side controls */}
-            <Animated.View
-              entering={FadeIn.delay(150).duration(500)}
-              className="flex-row items-center gap-2"
-            >
-              {/* Gear / settings */}
+          {/* Top bar: Profile | Streak | Settings */}
+          <Animated.View
+            entering={FadeIn.delay(100).duration(500)}
+            style={styles.topBar}
+          >
+            {/* Left: Profile */}
+            <View style={styles.topBarSide}>
               <Pressable
-                onPress={() => router.push("/settings")}
+                onPress={() => router.push("/profile")}
                 accessibilityRole="button"
-                accessibilityLabel="Einstellungen öffnen"
-                style={styles.soundBtn}
+                accessibilityLabel="Profil öffnen"
+                style={styles.iconBtn}
               >
-                <Text style={styles.soundBtnIcon}>⚙️</Text>
+                <Text style={styles.iconBtnText}>👤</Text>
               </Pressable>
+            </View>
 
-              {/* Sound toggle */}
-              <Pressable
-                onPress={toggleSound}
-                accessibilityRole="button"
-                accessibilityLabel={soundEnabled ? "Ton ausschalten" : "Ton einschalten"}
-                style={styles.soundBtn}
-              >
-                <Text style={styles.soundBtnIcon}>{soundEnabled ? "🔊" : "🔇"}</Text>
-              </Pressable>
-
-              {/* Streak badge */}
-              <View
-                className="flex-row items-center bg-surface px-4 py-2.5 rounded-2xl"
-                style={styles.streakBadge}
-              >
+            {/* Center: Streak badge */}
+            <View style={styles.topBarCenter}>
+              <View style={[styles.streakBadge, { backgroundColor: "#1A2E35" }]}>
                 <Animated.Text style={[styles.streakFlame, flameStyle]}>🔥</Animated.Text>
                 <Text style={styles.streakLabel}>Tag </Text>
                 <Text style={styles.streakNum}>{currentStreak}</Text>
               </View>
-            </Animated.View>
-          </View>
+            </View>
+
+            {/* Right: Settings */}
+            <View style={[styles.topBarSide, { alignItems: "flex-end" }]}>
+              <Pressable
+                onPress={() => router.push("/settings")}
+                accessibilityRole="button"
+                accessibilityLabel="Einstellungen öffnen"
+                style={styles.iconBtn}
+              >
+                <Text style={styles.iconBtnText}>⚙️</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+
+          {/* Title — centered, wide */}
+          <Animated.View entering={FadeIn.duration(600)} style={{ alignItems: "center", marginTop: 20, marginBottom: 0 }}>
+            <Text style={styles.titleText}>
+              <Text style={{ color: "#1CB0F6" }}>Prä</Text>
+              <Text style={{ color: "#FFC800" }}>Fix</Text>
+            </Text>
+          </Animated.View>
 
           {/* Subtitle */}
-          <Animated.View entering={FadeIn.delay(80).duration(600)}>
-            <Text className="text-muted text-base">
+          <Animated.View entering={FadeIn.delay(80).duration(600)} style={{ alignItems: "center" }}>
+            <Text className="text-muted text-base" style={{ fontFamily: "Nunito_400Regular" }}>
               Trennbare Verben meistern
             </Text>
           </Animated.View>
@@ -325,15 +324,21 @@ export default function HomeScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  titleText: {
-    fontSize: 40,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    lineHeight: 46,
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  soundBtn: {
-    width: 40,
-    height: 40,
+  topBarSide: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  topBarCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#1A2E35",
@@ -341,10 +346,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#2C4551",
   },
-  soundBtnIcon: {
+  iconBtnText: {
     fontSize: 18,
   },
+  titleText: {
+    fontFamily: "GravitasOne_400Regular",
+    fontSize: 52,
+    letterSpacing: 3,
+    lineHeight: 60,
+    textAlign: "center",
+  },
   streakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: "#FF9600",
   },
@@ -352,15 +369,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   streakLabel: {
+    fontFamily: "Nunito_700Bold",
     color: "#FF9600",
-    fontWeight: "700",
     fontSize: 13,
     marginLeft: 6,
-    marginTop: 1, // optical alignment
+    marginTop: 1,
   },
   streakNum: {
+    fontFamily: "GravitasOne_400Regular",
     color: "#FF9600",
-    fontWeight: "900",
     fontSize: 18,
   },
   cardShadow: {

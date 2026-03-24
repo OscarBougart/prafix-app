@@ -29,7 +29,9 @@ export default function RootLayout() {
   // Example:
   //   'Nunito_400Regular': require('../assets/fonts/Nunito-Regular.ttf'),
   const [fontsLoaded, fontError] = useFonts({
-    // placeholder — add your fonts here
+    GravitasOne_400Regular: require("@expo-google-fonts/gravitas-one/400Regular/GravitasOne_400Regular.ttf"),
+    Nunito_700Bold:         require("@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf"),
+    Nunito_400Regular:      require("@expo-google-fonts/nunito/400Regular/Nunito_400Regular.ttf"),
   });
 
   // Hide splash screen once fonts are ready (or if there's an error)
@@ -65,6 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="game/[level]" options={{ headerShown: false, animation: "slide_from_bottom" }} />
         <Stack.Screen name="results" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="profile" options={{ animation: "slide_from_right" }} />
       </Stack>
     </GestureHandlerRootView>
   );

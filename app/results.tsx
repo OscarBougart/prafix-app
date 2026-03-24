@@ -336,14 +336,14 @@ const S = StyleSheet.create({
     marginBottom: 18,
   },
   scoreMain: {
+    fontFamily: "GravitasOne_400Regular",
     fontSize: 88,
-    fontWeight: "900",
     color: C.foreground,
     lineHeight: 96,
   },
   scoreDenom: {
+    fontFamily: "Nunito_400Regular",
     fontSize: 34,
-    fontWeight: "700",
     color: C.muted,
   },
   starsRow: {
@@ -369,9 +369,9 @@ const S = StyleSheet.create({
     lineHeight: 56,
   },
   retryMsg: {
+    fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 15,
-    fontWeight: "600",
     marginTop: 10,
   },
 
@@ -392,12 +392,13 @@ const S = StyleSheet.create({
     fontSize: 30,
   },
   celebrationTitle: {
+    fontFamily: "GravitasOne_400Regular",
     color: C.gold,
     fontSize: 15,
-    fontWeight: "800",
     lineHeight: 20,
   },
   celebrationSub: {
+    fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 13,
     marginTop: 2,
@@ -410,9 +411,9 @@ const S = StyleSheet.create({
     paddingBottom: 16,
   },
   listLabel: {
+    fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 11,
-    fontWeight: "700",
     letterSpacing: 1.4,
     marginBottom: 14,
   },
@@ -436,24 +437,26 @@ const S = StyleSheet.create({
     flexShrink: 0,
   },
   iconText: {
+    fontFamily: "Nunito_700Bold",
     color: C.foreground,
     fontSize: 13,
-    fontWeight: "800",
   },
   rowSentence: {
+    fontFamily: "Nunito_700Bold",
     color: C.foreground,
     fontSize: 15,
-    fontWeight: "500",
     lineHeight: 22,
     marginBottom: 3,
   },
   rowTranslation: {
+    fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 13,
     fontStyle: "italic",
     lineHeight: 18,
   },
   rowWrongLine: {
+    fontFamily: "Nunito_400Regular",
     marginTop: 6,
     fontSize: 13,
     color: C.muted,
@@ -489,8 +492,8 @@ const S = StyleSheet.create({
     borderColor: C.gold,
   },
   btnText: {
+    fontFamily: "Nunito_700Bold",
     fontSize: 16,
-    fontWeight: "800",
     letterSpacing: 0.3,
   },
 

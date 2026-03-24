@@ -181,7 +181,7 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
     answer.phase === "idle" ? "700" : "900";
 
   const blankNode = (
-    <Text style={{ color: blankColor, fontWeight: blankWeight, fontSize: 20 }}>
+    <Text style={{ fontFamily: "Nunito_700Bold", color: blankColor, fontSize: 20 }}>
       {blankText}
     </Text>
   );
@@ -476,9 +476,9 @@ const S = StyleSheet.create({
     justifyContent: "center",
   },
   closeBtnText: {
+    fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 18,
-    fontWeight: "600",
   },
   progressTrack: {
     width: PROGRESS_TRACK_W,
@@ -501,8 +501,8 @@ const S = StyleSheet.create({
   },
   scoreNum: {
     color: C.foreground,
+    fontFamily: "GravitasOne_400Regular",
     fontSize: 18,
-    fontWeight: "800",
   },
   scoreStar: {
     fontSize: 16,
@@ -510,9 +510,9 @@ const S = StyleSheet.create({
 
   // Sentence counter
   sentenceCounter: {
+    fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 13,
-    fontWeight: "600",
     textAlign: "right",
   },
 
@@ -532,22 +532,22 @@ const S = StyleSheet.create({
     elevation: 6,
   },
   sentenceText: {
+    fontFamily: "Nunito_700Bold",
     color: C.foreground,
     fontSize: 20,
-    fontWeight: "500",
     lineHeight: 30,
   },
   // Verb stem chip (Präsens: auto-filled first blank)
   verbChipText: {
+    fontFamily: "Nunito_700Bold",
     color: C.stemColor,
-    fontWeight: "700",
     fontSize: 20,
     backgroundColor: "rgba(28,176,246,0.14)",
   },
   // Stem text after prefix blank (Perfekt / Nebensatz)
   stemChipText: {
+    fontFamily: "Nunito_700Bold",
     color: C.stemColor,
-    fontWeight: "700",
     fontSize: 20,
   },
   divider: {
@@ -555,6 +555,7 @@ const S = StyleSheet.create({
     backgroundColor: C.border,
   },
   translationText: {
+    fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 14,
     fontStyle: "italic",
@@ -579,8 +580,8 @@ const S = StyleSheet.create({
     borderBottomWidth: 4,
   },
   optionBtnText: {
+    fontFamily: "Nunito_700Bold",
     fontSize: 17,
-    fontWeight: "800",
     letterSpacing: 0.2,
   },
 });

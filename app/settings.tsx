@@ -7,7 +7,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import Constants from "expo-constants";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -29,6 +29,25 @@ const C = {
   red:        "#FF4B4B",
   redDark:    "#CC3333",
 } as const;
+
+// ─── SettingsHeader ───────────────────────────────────────────────────────────
+
+function SettingsHeader({ onBack }: { onBack: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[S.headerBar, { paddingTop: insets.top }]}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Zurück"
+        style={S.headerBack}
+      >
+        <Text style={S.headerArrow}>‹</Text>
+      </Pressable>
+      <Text style={S.headerTitle} pointerEvents="none">Einstellungen</Text>
+    </View>
+  );
+}
 
 // ─── SettingsRow ──────────────────────────────────────────────────────────────
 
@@ -85,14 +104,11 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={S.root} edges={["top", "bottom"]}>
+    <SafeAreaView style={S.root} edges={["bottom"]}>
       <Stack.Screen
         options={{
-          title: "Einstellungen",
           headerShown: true,
-          headerStyle: { backgroundColor: C.bg },
-          headerTintColor: C.foreground,
-          headerTitleStyle: { fontWeight: "bold" },
+          header: () => <SettingsHeader onBack={() => router.back()} />,
         }}
       />
 
@@ -128,7 +144,7 @@ export default function SettingsScreen() {
               <Switch
                 value={settings.showTranslation}
                 onValueChange={(val) => updateSettings({ showTranslation: val })}
-                trackColor={{ false: C.border, true: C.blue }}
+                trackColor={{ false: C.border, true: C.gold }}
                 thumbColor={C.foreground}
                 accessibilityLabel="Übersetzung ein- oder ausschalten"
               />
@@ -136,25 +152,8 @@ export default function SettingsScreen() {
           </View>
         </Animated.View>
 
-        {/* ── Data ── */}
-        <Animated.View entering={FadeInDown.delay(80).duration(350)}>
-          <SectionHeader title="DATEN" />
-
-          <View style={S.card}>
-            <Pressable
-              onPress={handleResetProgress}
-              style={({ pressed }) => [S.dangerRow, pressed && { opacity: 0.7 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Fortschritt zurücksetzen"
-            >
-              <Text style={S.dangerLabel}>Fortschritt zurücksetzen</Text>
-              <Text style={S.dangerArrow}>›</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-
         {/* ── About ── */}
-        <Animated.View entering={FadeInDown.delay(160).duration(350)}>
+        <Animated.View entering={FadeInDown.delay(80).duration(350)}>
           <SectionHeader title="APP-INFO" />
 
           <View style={S.card}>
@@ -175,6 +174,22 @@ export default function SettingsScreen() {
             </SettingsRow>
           </View>
         </Animated.View>
+
+        {/* ── Data ── */}
+        <Animated.View entering={FadeInDown.delay(160).duration(350)}>
+          <SectionHeader title="DATEN" />
+
+          <View style={S.card}>
+            <Pressable
+              onPress={handleResetProgress}
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Fortschritt zurücksetzen"
+            >
+              <Text style={S.dangerLabel}>Fortschritt zurücksetzen</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -187,17 +202,44 @@ const S = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
+  headerBar: {
+    backgroundColor: C.bg,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingBottom: 14,
+  },
+  headerBack: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  headerArrow: {
+    color: C.foreground,
+    fontSize: 50,
+    fontWeight: "300",
+    includeFontPadding: false,
+  },
+  headerTitle: {
+    fontFamily: "Nunito_700Bold",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    color: C.foreground,
+    fontSize: 17,
+    textAlign: "center",
+  },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 40,
   },
   sectionHeader: {
+    fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 11,
-    fontWeight: "700",
     letterSpacing: 1.4,
     marginBottom: 10,
-    marginTop: 24,
+    marginTop: 14,
     marginLeft: 4,
   },
   card: {
@@ -215,11 +257,12 @@ const S = StyleSheet.create({
     minHeight: 56,
   },
   rowLabel: {
+    fontFamily: "Nunito_700Bold",
     color: C.foreground,
     fontSize: 15,
-    fontWeight: "600",
   },
   rowDesc: {
+    fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 12,
     marginTop: 2,
@@ -233,25 +276,16 @@ const S = StyleSheet.create({
     backgroundColor: C.border,
     marginLeft: 16,
   },
-  dangerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    minHeight: 56,
-  },
   dangerLabel: {
-    flex: 1,
+    fontFamily: "Nunito_700Bold",
     color: C.red,
     fontSize: 15,
-    fontWeight: "600",
-  },
-  dangerArrow: {
-    color: C.red,
-    fontSize: 20,
-    fontWeight: "300",
+    textAlign: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 18,
   },
   valueText: {
+    fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 14,
   },
