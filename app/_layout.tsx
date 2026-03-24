@@ -55,16 +55,16 @@ export default function RootLayout() {
 
       <Stack
         screenOptions={{
-          // Default header style — matches the dark palette
           headerStyle: { backgroundColor: "#001d3d" },
           headerTintColor: "#FFFFFF",
           headerTitleStyle: { fontWeight: "bold" },
-          // Uncomment to hide headers globally and control per-screen:
-          // headerShown: false,
+          animation: "slide_from_right",
         }}
       >
-        {/* Add additional screens/groups here as your app grows */}
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false, animation: "none" }} />
+        <Stack.Screen name="game/[level]" options={{ headerShown: false, animation: "slide_from_bottom" }} />
+        <Stack.Screen name="results" options={{ headerShown: false, animation: "fade" }} />
+        <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
       </Stack>
     </GestureHandlerRootView>
   );

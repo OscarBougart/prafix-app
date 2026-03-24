@@ -1,19 +1,22 @@
 {
   "expo": {
-    "name": "base-template",
-    "slug": "base-template",
+    "name": "PräFix",
+    "slug": "prafix-app",
     "version": "1.0.0",
+    "description": "Master German separable verbs with a fun quiz game",
     "orientation": "portrait",
-    "scheme": "base-template",
-    "userInterfaceStyle": "automatic",
+    "scheme": "prafix",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.prafix.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#131F24"
-      }
+        "backgroundColor": "#001d3d"
+      },
+      "package": "com.prafix.app"
     },
     "web": {
       "bundler": "metro",

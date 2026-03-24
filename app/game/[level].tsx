@@ -21,6 +21,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
 import { useSound } from "@/hooks/useSound";
+import { useSettings } from "@/hooks/useSettings";
 import { setPendingResult } from "@/utils/resultsStore";
 import type { Sentence } from "@/data/types";
 
@@ -255,6 +256,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
   // ── Answer state ────────────────────────────────────────────────────────────
   const [answer, setAnswer] = useState<AnswerState>(IDLE);
   const { playCorrect, playWrong } = useSound();
+  const { settings } = useSettings();
 
   // ── Animations ──────────────────────────────────────────────────────────────
 
@@ -376,16 +378,19 @@ function GameRound({ level, subLevel }: GameRoundProps) {
 
       {/* ── Sentence card ── */}
       <View className="flex-1 px-5 justify-center">
-        <Animated.View
-          key={displayedSentence.id}
-          entering={FadeInDown.duration(350).springify()}
-          style={[S.sentenceCard, cardStyle]}
-        >
-          <SentenceDisplay sentence={displayedSentence} answer={answer} />
+        {/* Outer view owns the enter animation; inner view owns the scale transform. */}
+        {/* Combining both on one Animated.View causes a Reanimated conflict warning. */}
+        <Animated.View key={displayedSentence.id} entering={FadeInDown.duration(350).springify()}>
+          <Animated.View style={[S.sentenceCard, cardStyle]}>
+            <SentenceDisplay sentence={displayedSentence} answer={answer} />
 
-          <View style={S.divider} />
-
-          <Text style={S.translationText}>{displayedSentence.translation}</Text>
+            {settings.showTranslation && (
+              <>
+                <View style={S.divider} />
+                <Text style={S.translationText}>{displayedSentence.translation}</Text>
+              </>
+            )}
+          </Animated.View>
         </Animated.View>
       </View>
 

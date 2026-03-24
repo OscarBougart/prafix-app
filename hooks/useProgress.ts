@@ -51,6 +51,8 @@ export interface ProgressReturn {
   getTotalStars: () => number;
   /** Wipe all progress. Used for dev resets — prompt the user first. */
   resetProgress: () => Promise<void>;
+  /** Re-read progress from AsyncStorage. Call via useFocusEffect on the home screen. */
+  reloadProgress: () => Promise<void>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -194,6 +196,14 @@ export function useProgress(): ProgressReturn {
     await storage.remove(PROGRESS_KEY);
   }, []);
 
+  // ── reloadProgress ──────────────────────────────────────────────────────────
+  const reloadProgress = useCallback(async (): Promise<void> => {
+    const stored = await storage.get<ProgressData>(PROGRESS_KEY);
+    const data = stored ?? {};
+    setProgress(data);
+    progressRef.current = data;
+  }, []);
+
   // ── Reactive wrappers ───────────────────────────────────────────────────────
   // getLevelProgress, isLevelUnlocked, getTotalStars all read from progressRef
   // so they return the latest values without needing re-creation. However, the
@@ -212,10 +222,11 @@ export function useProgress(): ProgressReturn {
       isLevelUnlocked,
       getTotalStars,
       resetProgress,
+      reloadProgress,
     }),
     // Only re-create the object when isLoading changes or after a save
     // (progress state change). The callback refs are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, progress, saveRoundResult, getLevelProgress, isLevelUnlocked, getTotalStars, resetProgress],
+    [isLoading, progress, saveRoundResult, getLevelProgress, isLevelUnlocked, getTotalStars, resetProgress, reloadProgress],
   );
 }

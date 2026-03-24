@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -191,7 +192,7 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
 export default function HomeScreen() {
   const router = useRouter();
   const { unlocked } = useLocalSearchParams<{ unlocked?: string }>();
-  const { getLevelProgress, isLevelUnlocked } = useProgress();
+  const { getLevelProgress, isLevelUnlocked, reloadProgress } = useProgress();
   const { currentStreak } = useStreak();
   const { soundEnabled, toggleSound, playUnlock } = useSound();
 
@@ -214,6 +215,13 @@ export default function HomeScreen() {
       flameScale.value = withTiming(1, { duration: 300 });
     }
   }, [currentStreak]);
+
+  // ── Reload progress each time the home screen comes into focus ──────────────
+  useFocusEffect(
+    useCallback(() => {
+      reloadProgress();
+    }, [reloadProgress]),
+  );
 
   // ── Play unlock sound once when arriving from a level completion ─────────────
   const unlockedPlayed = useRef(false);
@@ -256,6 +264,16 @@ export default function HomeScreen() {
               entering={FadeIn.delay(150).duration(500)}
               className="flex-row items-center gap-2"
             >
+              {/* Gear / settings */}
+              <Pressable
+                onPress={() => router.push("/settings")}
+                accessibilityRole="button"
+                accessibilityLabel="Einstellungen öffnen"
+                style={styles.soundBtn}
+              >
+                <Text style={styles.soundBtnIcon}>⚙️</Text>
+              </Pressable>
+
               {/* Sound toggle */}
               <Pressable
                 onPress={toggleSound}

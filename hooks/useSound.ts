@@ -64,22 +64,22 @@ export function useSound(): SoundReturn {
   // ── Play helpers ───────────────────────────────────────────────────────────
   const playCorrect = useCallback((): void => {
     if (!enabledRef.current) return;
-    try { correctPlayer.play(); } catch (e) { console.warn("[useSound] correct:", e); }
+    correctPlayer.seekTo(0).then(() => correctPlayer.play()).catch((e) => console.warn("[useSound] correct:", e));
   }, [correctPlayer]);
 
   const playWrong = useCallback((): void => {
     if (!enabledRef.current) return;
-    try { wrongPlayer.play(); } catch (e) { console.warn("[useSound] wrong:", e); }
+    wrongPlayer.seekTo(0).then(() => wrongPlayer.play()).catch((e) => console.warn("[useSound] wrong:", e));
   }, [wrongPlayer]);
 
   const playLevelComplete = useCallback((): void => {
     if (!enabledRef.current) return;
-    try { completePlayer.play(); } catch (e) { console.warn("[useSound] complete:", e); }
+    completePlayer.seekTo(0).then(() => completePlayer.play()).catch((e) => console.warn("[useSound] complete:", e));
   }, [completePlayer]);
 
   const playUnlock = useCallback((): void => {
     if (!enabledRef.current) return;
-    try { unlockPlayer.play(); } catch (e) { console.warn("[useSound] unlock:", e); }
+    unlockPlayer.seekTo(0).then(() => unlockPlayer.play()).catch((e) => console.warn("[useSound] unlock:", e));
   }, [unlockPlayer]);
 
   return { soundEnabled, toggleSound, playCorrect, playWrong, playLevelComplete, playUnlock };
