@@ -22,6 +22,7 @@ import { useEffect, useRef } from "react";
 
 import { useProgress } from "@/hooks/useProgress";
 import { useStreak } from "@/hooks/useStreak";
+import { useSound } from "@/hooks/useSound";
 import { consumePendingResult, type PendingRoundResult } from "@/utils/resultsStore";
 import type { SentenceResult } from "@/hooks/useGameEngine";
 import type { Sentence } from "@/data/types";
@@ -168,8 +169,12 @@ export default function ResultsScreen() {
   const sentenceResults: SentenceResult[] = roundRef.current?.results ?? [];
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
-  const { saveRoundResult } = useProgress();
-  const { bumpStreak }      = useStreak();
+  const { saveRoundResult }  = useProgress();
+  const { bumpStreak }       = useStreak();
+  const { playLevelComplete } = useSound();
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const isLevelComplete = subLevel === 5 && stars >= 1;
 
   // ── Save once on mount ─────────────────────────────────────────────────────
   const savedRef = useRef(false);
@@ -181,11 +186,12 @@ export default function ResultsScreen() {
       bumpStreak();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    // Delay gives expo-audio time to finish loading the asset before play() is called.
+    // Play complete sound for any finished round (not just the final subLevel).
+    const t = setTimeout(() => playLevelComplete(), 400);
+    return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const isLevelComplete = subLevel === 5 && stars >= 1;
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   const handleRetry = () => {
@@ -202,6 +208,12 @@ export default function ResultsScreen() {
       router.replace({
         pathname: "/game/[level]",
         params: { level: String(level), subLevel: String(subLevel + 1) },
+      });
+    } else if (isLevelComplete) {
+      // Pass unlocked=next level so the home screen can play the unlock sound
+      router.replace({
+        pathname: "/",
+        params: level < 4 ? { unlocked: String(level + 1) } : {},
       });
     } else {
       router.replace("/");

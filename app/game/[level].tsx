@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
+import { useSound } from "@/hooks/useSound";
 import { setPendingResult } from "@/utils/resultsStore";
 import type { Sentence } from "@/data/types";
 
@@ -253,6 +254,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
 
   // ── Answer state ────────────────────────────────────────────────────────────
   const [answer, setAnswer] = useState<AnswerState>(IDLE);
+  const { playCorrect, playWrong } = useSound();
 
   // ── Animations ──────────────────────────────────────────────────────────────
 
@@ -304,7 +306,8 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         correctPrefix: currentSentence.correctPrefix,
       });
 
-      // Haptic
+      // Sound + haptic
+      if (isCorrect) { playCorrect(); } else { playWrong(); }
       Haptics.notificationAsync(
         isCorrect
           ? Haptics.NotificationFeedbackType.Success
@@ -327,7 +330,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         setAnswer(IDLE);
       }, delay);
     },
-    [answer.phase, currentSentence, submitAnswer, cardScale],
+    [answer.phase, currentSentence, submitAnswer, cardScale, playCorrect, playWrong],
   );
 
   // ── Render ──────────────────────────────────────────────────────────────────

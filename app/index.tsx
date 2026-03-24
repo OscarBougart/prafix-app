@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -14,6 +14,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { useProgress, type SubLevelRecord } from "@/hooks/useProgress";
 import { useStreak } from "@/hooks/useStreak";
+import { useSound } from "@/hooks/useSound";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -189,8 +190,10 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { unlocked } = useLocalSearchParams<{ unlocked?: string }>();
   const { getLevelProgress, isLevelUnlocked } = useProgress();
   const { currentStreak } = useStreak();
+  const { soundEnabled, toggleSound, playUnlock } = useSound();
 
   // ── Flame pulse — subtle scale breathe when streak is active ────────────────
   const flameScale = useSharedValue(1);
@@ -211,6 +214,16 @@ export default function HomeScreen() {
       flameScale.value = withTiming(1, { duration: 300 });
     }
   }, [currentStreak]);
+
+  // ── Play unlock sound once when arriving from a level completion ─────────────
+  const unlockedPlayed = useRef(false);
+  useEffect(() => {
+    if (unlocked && !unlockedPlayed.current) {
+      unlockedPlayed.current = true;
+      const t = setTimeout(() => playUnlock(), 350); // short delay lets screen settle
+      return () => clearTimeout(t);
+    }
+  }, [unlocked]);
 
   const handleCardPress = (level: 1 | 2 | 3 | 4) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -238,15 +251,30 @@ export default function HomeScreen() {
               </Text>
             </Animated.View>
 
-            {/* Streak badge */}
+            {/* Right-side controls */}
             <Animated.View
               entering={FadeIn.delay(150).duration(500)}
-              className="flex-row items-center bg-surface px-4 py-2.5 rounded-2xl"
-              style={styles.streakBadge}
+              className="flex-row items-center gap-2"
             >
-              <Animated.Text style={[styles.streakFlame, flameStyle]}>🔥</Animated.Text>
-              <Text style={styles.streakLabel}>Tag </Text>
-              <Text style={styles.streakNum}>{currentStreak}</Text>
+              {/* Sound toggle */}
+              <Pressable
+                onPress={toggleSound}
+                accessibilityRole="button"
+                accessibilityLabel={soundEnabled ? "Ton ausschalten" : "Ton einschalten"}
+                style={styles.soundBtn}
+              >
+                <Text style={styles.soundBtnIcon}>{soundEnabled ? "🔊" : "🔇"}</Text>
+              </Pressable>
+
+              {/* Streak badge */}
+              <View
+                className="flex-row items-center bg-surface px-4 py-2.5 rounded-2xl"
+                style={styles.streakBadge}
+              >
+                <Animated.Text style={[styles.streakFlame, flameStyle]}>🔥</Animated.Text>
+                <Text style={styles.streakLabel}>Tag </Text>
+                <Text style={styles.streakNum}>{currentStreak}</Text>
+              </View>
             </Animated.View>
           </View>
 
@@ -284,6 +312,19 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.5,
     lineHeight: 46,
+  },
+  soundBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1A2E35",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#2C4551",
+  },
+  soundBtnIcon: {
+    fontSize: 18,
   },
   streakBadge: {
     borderWidth: 1.5,
