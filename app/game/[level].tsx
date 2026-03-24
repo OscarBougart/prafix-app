@@ -22,7 +22,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
 import { useSound } from "@/hooks/useSound";
+import { useFavorites } from "@/hooks/useFavorites";
+import { useWrongAnswers } from "@/hooks/useWrongAnswers";
 import { setPendingResult } from "@/utils/resultsStore";
+import { allSentences } from "@/data/sentences";
 import type { Sentence } from "@/data/types";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -177,9 +180,6 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
       ? C.correct
       : C.wrong;
 
-  const blankWeight: "700" | "900" =
-    answer.phase === "idle" ? "700" : "900";
-
   const blankNode = (
     <Text style={{ fontFamily: "Nunito_700Bold", color: blankColor, fontSize: 20 }}>
       {blankText}
@@ -217,9 +217,10 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
 interface GameRoundProps {
   level: 1 | 2 | 3 | 4;
   subLevel: 1 | 2 | 3 | 4 | 5;
+  customSentences?: Sentence[];
 }
 
-function GameRound({ level, subLevel }: GameRoundProps) {
+function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
   const router = useRouter();
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
@@ -233,7 +234,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
     submitAnswer,
     stars,
     results,
-  } = useGameEngine({ level, subLevel });
+  } = useGameEngine({ level, subLevel, customSentences });
 
   // Hold last sentence visible during the result-animation delay
   const [displayedSentence, setDisplayedSentence] = useState<Sentence | null>(
@@ -256,6 +257,8 @@ function GameRound({ level, subLevel }: GameRoundProps) {
   // ── Answer state ────────────────────────────────────────────────────────────
   const [answer, setAnswer] = useState<AnswerState>(IDLE);
   const { playCorrect, playWrong } = useSound();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { addWrongAnswer } = useWrongAnswers();
 
   // ── Translation toggle — reset on each new sentence ─────────────────────────
   const [showTranslation, setShowTranslation] = useState(false);
@@ -302,7 +305,14 @@ function GameRound({ level, subLevel }: GameRoundProps) {
   // ── Handle tap ──────────────────────────────────────────────────────────────
   const handleOptionPress = useCallback(
     (prefix: string) => {
-      if (answer.phase === "answering" || !currentSentence) return;
+      if (!currentSentence) return;
+
+      // Answer already shown — any tap advances to next sentence
+      if (answer.phase === "answering") {
+        submitAnswer(answer.selectedPrefix);
+        setAnswer(IDLE);
+        return;
+      }
 
       const isCorrect = prefix === currentSentence.correctPrefix;
 
@@ -312,6 +322,9 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         isCorrect,
         correctPrefix: currentSentence.correctPrefix,
       });
+
+      // Track wrong answers
+      if (!isCorrect) addWrongAnswer(currentSentence.id);
 
       // Sound + haptic
       if (isCorrect) { playCorrect(); } else { playWrong(); }
@@ -328,16 +341,9 @@ function GameRound({ level, subLevel }: GameRoundProps) {
           withSpring(1,    { damping: 14, stiffness: 250 }),
         );
       }
-
-      // Advance after delay
-      const delay = isCorrect ? 800 : 1200;
-      setTimeout(() => {
-        if (!isMounted.current) return;
-        submitAnswer(prefix);
-        setAnswer(IDLE);
-      }, delay);
+      // Both correct and wrong: wait for user tap to advance (handled above)
     },
-    [answer.phase, currentSentence, submitAnswer, cardScale, playCorrect, playWrong],
+    [answer, currentSentence, submitAnswer, cardScale, playCorrect, playWrong, addWrongAnswer],
   );
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -379,10 +385,28 @@ function GameRound({ level, subLevel }: GameRoundProps) {
         {/* Outer view owns the enter animation; inner view owns the scale transform. */}
         {/* Combining both on one Animated.View causes a Reanimated conflict warning. */}
         <Animated.View key={displayedSentence.id} entering={FadeInDown.duration(350).springify()}>
-          {/* Sentence counter — right-aligned above the card */}
-          <Text style={[S.sentenceCounter, { marginBottom: 6 }]}>
-            {sentenceIndex + 1} / {totalSentences}
-          </Text>
+
+          {/* Above-card row: sentence counter left, heart right */}
+          <View style={S.aboveCardRow}>
+            <Text style={S.sentenceCounter}>
+              {sentenceIndex + 1} / {totalSentences}
+            </Text>
+            {isAnswering && (
+              <Pressable
+                onPress={() => toggleFavorite(displayedSentence.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Favorit umschalten"
+                hitSlop={8}
+              >
+                <Entypo
+                  name={isFavorite(displayedSentence.id) ? "heart" : "heart-outlined"}
+                  size={24}
+                  color={isFavorite(displayedSentence.id) ? C.wrong : C.muted}
+                />
+              </Pressable>
+            )}
+          </View>
+
           <Animated.View style={[S.sentenceCard, cardStyle]}>
             <SentenceDisplay sentence={displayedSentence} answer={answer} />
           </Animated.View>
@@ -390,7 +414,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
           {/* Translate button + translation below card, right-aligned */}
           <View style={S.translationRow}>
             {showTranslation && (
-              <Text style={S.translationText}>{displayedSentence.translation}</Text>
+              <Text style={[S.translationText, { flex: 1 }]}>{displayedSentence.translation}</Text>
             )}
             <Pressable
               onPress={() => setShowTranslation((v) => !v)}
@@ -401,6 +425,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
               <MaterialIcons name="translate" size={24} color={showTranslation ? C.blue : C.muted} />
             </Pressable>
           </View>
+
         </Animated.View>
       </View>
 
@@ -413,7 +438,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
               option={opt}
               btnState={getBtnState(opt, answer)}
               onPress={() => handleOptionPress(opt)}
-              disabled={isAnswering || opt === ""}
+              disabled={opt === ""}
             />
           ))}
         </View>
@@ -424,7 +449,7 @@ function GameRound({ level, subLevel }: GameRoundProps) {
               option={opt}
               btnState={getBtnState(opt, answer)}
               onPress={() => handleOptionPress(opt)}
-              disabled={isAnswering || opt === ""}
+              disabled={opt === ""}
             />
           ))}
         </View>
@@ -439,14 +464,16 @@ function GameRound({ level, subLevel }: GameRoundProps) {
 // given level. If all 5 subLevels are complete, replays from subLevel 1.
 
 export default function GameScreen() {
-  const { level: levelParam, subLevel: subLevelParam } = useLocalSearchParams<{
+  const { level: levelParam, subLevel: subLevelParam, mode } = useLocalSearchParams<{
     level: string;
     subLevel?: string;
+    mode?: "favorites" | "wrong";
   }>();
-  const level = Math.max(1, Math.min(4, parseInt(levelParam ?? "1", 10))) as
-    | 1 | 2 | 3 | 4;
+  const level = Math.max(1, Math.min(4, parseInt(levelParam ?? "1", 10))) as 1 | 2 | 3 | 4;
 
   const { isLoading, getLevelProgress } = useProgress();
+  const { favoriteIds } = useFavorites();
+  const { wrongAnswerIds } = useWrongAnswers();
 
   if (isLoading) {
     return (
@@ -455,6 +482,28 @@ export default function GameScreen() {
         <Text className="text-muted text-base">Lädt…</Text>
       </SafeAreaView>
     );
+  }
+
+  // Custom modes: favorites or wrong answers
+  if (mode === "favorites" || mode === "wrong") {
+    const ids = mode === "favorites" ? favoriteIds : wrongAnswerIds;
+    const customSentences = allSentences.filter((s) => ids.has(s.id));
+
+    if (customSentences.length === 0) {
+      return (
+        <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={["top", "bottom"]}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <Text className="text-foreground text-lg" style={{ fontFamily: "Nunito_700Bold", marginBottom: 8 }}>
+            {mode === "favorites" ? "Keine Favoriten" : "Keine Fehler gespeichert"}
+          </Text>
+          <Text className="text-muted text-sm" style={{ fontFamily: "Nunito_400Regular" }}>
+            {mode === "favorites" ? "Markiere Sätze im Spiel mit ♥" : "Spiele eine Runde, um Fehler zu speichern"}
+          </Text>
+        </SafeAreaView>
+      );
+    }
+
+    return <GameRound level={1} subLevel={1} customSentences={customSentences} />;
   }
 
   let subLevel: 1 | 2 | 3 | 4 | 5;
@@ -572,11 +621,25 @@ const S = StyleSheet.create({
   },
   translationRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 8,
     paddingHorizontal: 4,
+  },
+  aboveCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  tapToContinue: {
+    fontFamily: "Nunito_400Regular",
+    color: C.muted,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 6,
   },
 
   // Options

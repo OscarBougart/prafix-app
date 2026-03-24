@@ -81,13 +81,19 @@ function calculateStars(score: number): number {
 export function useGameEngine({
   level,
   subLevel,
+  customSentences,
 }: {
   level: 1 | 2 | 3 | 4;
   subLevel: 1 | 2 | 3 | 4 | 5;
+  customSentences?: Sentence[];
 }): GameEngineReturn {
   // Sentences are picked once at mount. Changing level/subLevel requires
   // remounting the component (or adding a key prop on the parent).
-  const [sentences] = useState<Sentence[]>(() => pickSentences(level, subLevel));
+  const [sentences] = useState<Sentence[]>(() =>
+    customSentences && customSentences.length > 0
+      ? shuffle(customSentences)
+      : pickSentences(level, subLevel),
+  );
 
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);

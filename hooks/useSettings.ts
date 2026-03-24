@@ -3,9 +3,13 @@ import { storage } from "@/utils/storage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type TranslationLanguage = "en" | "es" | "tr" | "ar" | "uk" | "fr";
+
 export interface AppSettings {
   /** Show the English translation in the sentence card during gameplay. */
   showTranslation: boolean;
+  /** Language to use for translations. */
+  translationLanguage: TranslationLanguage;
 }
 
 export interface SettingsReturn {
@@ -20,6 +24,7 @@ const SETTINGS_KEY = "prafix:settings";
 
 const DEFAULTS: AppSettings = {
   showTranslation: true,
+  translationLanguage: "en",
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

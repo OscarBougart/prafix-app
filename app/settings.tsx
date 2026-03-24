@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import { useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import Constants from "expo-constants";
@@ -77,11 +78,21 @@ function SectionHeader({ title }: { title: string }) {
 
 // ─── SettingsScreen ───────────────────────────────────────────────────────────
 
+const LANG_LABELS: Record<string, string> = {
+  en: "English",
+  es: "Español",
+  tr: "Türkçe",
+  ar: "العربية",
+  uk: "Українська",
+  fr: "Français",
+};
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { soundEnabled, toggleSound } = useSound();
   const { settings, updateSettings } = useSettings();
   const { resetProgress } = useProgress();
+  const [langOpen, setLangOpen] = useState(false);
 
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
 
@@ -139,7 +150,7 @@ export default function SettingsScreen() {
 
             <SettingsRow
               label="Übersetzung anzeigen"
-              description="Englische Übersetzung im Spielfeld"
+              description="Übersetzung im Spielfeld anzeigen"
             >
               <Switch
                 value={settings.showTranslation}
@@ -149,6 +160,44 @@ export default function SettingsScreen() {
                 accessibilityLabel="Übersetzung ein- oder ausschalten"
               />
             </SettingsRow>
+
+            <View style={S.divider} />
+
+            <Pressable
+              style={S.row}
+              onPress={() => setLangOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel="Übersetzungssprache wählen"
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={S.rowLabel}>Sprache</Text>
+                <Text style={S.rowDesc}>Sprache der Übersetzung</Text>
+              </View>
+              <View style={S.rowControl}>
+                <Text style={S.valueText}>{LANG_LABELS[settings.translationLanguage]}</Text>
+              </View>
+            </Pressable>
+
+            {langOpen && (
+              <View style={S.langGrid}>
+                {(["en", "es", "tr", "ar", "uk", "fr"] as const).map((code) => {
+                  const active = settings.translationLanguage === code;
+                  return (
+                    <Pressable
+                      key={code}
+                      onPress={() => { updateSettings({ translationLanguage: code }); setLangOpen(false); }}
+                      style={[S.langChip, active && S.langChipActive]}
+                      accessibilityRole="button"
+                      accessibilityLabel={LANG_LABELS[code]}
+                    >
+                      <Text style={[S.langChipText, active && S.langChipTextActive]}>
+                        {LANG_LABELS[code]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </Animated.View>
 
@@ -288,5 +337,32 @@ const S = StyleSheet.create({
     fontFamily: "Nunito_400Regular",
     color: C.muted,
     fontSize: 14,
+  },
+  langGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+  },
+  langChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    backgroundColor: "transparent",
+  },
+  langChipActive: {
+    backgroundColor: C.gold,
+    borderColor: C.gold,
+  },
+  langChipText: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 13,
+    color: C.muted,
+  },
+  langChipTextActive: {
+    color: "#001d3d",
   },
 });

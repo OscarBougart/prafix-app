@@ -289,6 +289,39 @@ export default function HomeScreen() {
               onPress={() => handleCardPress(def.level)}
             />
           ))}
+
+          {/* ── Extra mode cards ─────────────────────────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(4 * 130).duration(500)}>
+            <View style={styles.modeRow}>
+
+              {/* Favoriten */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: "/game/[level]", params: { level: "1", mode: "favorites" } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Favoriten üben"
+                style={[styles.modeCard, styles.modeCardFavorites]}
+              >
+                <Text style={styles.modeCardTitle}>Favoriten</Text>
+              </Pressable>
+
+              {/* Fehler üben */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: "/game/[level]", params: { level: "1", mode: "wrong" } });
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Fehler üben"
+                style={[styles.modeCard, styles.modeCardWrong]}
+              >
+                <Text style={styles.modeCardTitle}>Fehler üben</Text>
+              </Pressable>
+
+            </View>
+          </Animated.View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -402,5 +435,48 @@ const styles = StyleSheet.create({
   },
   textDimmed: {
     color: "#5A7080",
+  },
+  modeRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 14,
+  },
+  modeCard: {
+    flex: 1,
+    height: 90,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderBottomWidth: 5,
+    borderColor: "rgba(0,0,0,0.2)",
+    borderTopColor: "rgba(0,0,0,0.10)",
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modeCardFavorites: {
+    backgroundColor: "#E8547A",
+    borderBottomColor: "#C23F62",
+    shadowColor: "#E8547A",
+  },
+  modeCardWrong: {
+    backgroundColor: "#1CB0F6",
+    borderBottomColor: "#0A8FCF",
+    shadowColor: "#1CB0F6",
+  },
+  modeCardTitle: {
+    fontFamily: "GravitasOne_400Regular",
+    fontSize: 15,
+    color: "#001d3d",
+    textAlign: "center",
+  },
+  modeCardSub: {
+    fontFamily: "Nunito_400Regular",
+    fontSize: 12,
+    color: "rgba(0,29,61,0.65)",
+    letterSpacing: 0.5,
   },
 });

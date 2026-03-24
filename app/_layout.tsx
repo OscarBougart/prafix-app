@@ -67,7 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="game/[level]" options={{ headerShown: false, animation: "slide_from_bottom" }} />
         <Stack.Screen name="results" options={{ headerShown: false, animation: "fade" }} />
         <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
-        <Stack.Screen name="profile" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="profile" options={{ animation: "slide_from_left" }} />
       </Stack>
     </GestureHandlerRootView>
   );
