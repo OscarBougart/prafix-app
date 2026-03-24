@@ -17,42 +17,96 @@ import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
+import { Text, StyleSheet, Pressable } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 
-// Keep the splash screen visible while fonts load
+// Keep the native splash visible while fonts load
 SplashScreen.preventAutoHideAsync();
 
+// ─── Animated splash component ────────────────────────────────────────────────
+
+function AnimatedSplash({ onDone }: { onDone: () => void }) {
+  const opacity = useSharedValue(1);
+  const timerT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerDone = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skip = () => {
+    if (timerT.current) clearTimeout(timerT.current);
+    if (timerDone.current) clearTimeout(timerDone.current);
+    opacity.value = withTiming(0, { duration: 300 });
+    timerDone.current = setTimeout(() => onDone(), 300);
+  };
+
+  useEffect(() => {
+    timerT.current = setTimeout(() => {
+      opacity.value = withTiming(0, { duration: 500 });
+    }, 3900);
+    timerDone.current = setTimeout(() => onDone(), 4400);
+    return () => {
+      if (timerT.current) clearTimeout(timerT.current);
+      if (timerDone.current) clearTimeout(timerDone.current);
+    };
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Pressable onPress={skip} style={{ flex: 1 }}>
+      <Animated.View style={[splashStyles.root, animStyle]}>
+        <Text style={splashStyles.title}>
+          <Text style={{ color: "#1CB0F6" }}>Prä</Text>
+          <Text style={{ color: "#FFC800" }}>Fix</Text>
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const splashStyles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#001d3d",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999,
+  },
+  title: {
+    fontFamily: "GravitasOne_400Regular",
+    fontSize: 52,
+    letterSpacing: 4,
+  },
+});
+
+// ─── Root layout ──────────────────────────────────────────────────────────────
+
 export default function RootLayout() {
-  // ─── Font loading ─────────────────────────────────────────────────────────
-  // Add custom fonts here after dropping .ttf files into assets/fonts/
-  // Example:
-  //   'Nunito_400Regular': require('../assets/fonts/Nunito-Regular.ttf'),
   const [fontsLoaded, fontError] = useFonts({
     GravitasOne_400Regular: require("@expo-google-fonts/gravitas-one/400Regular/GravitasOne_400Regular.ttf"),
     Nunito_700Bold:         require("@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf"),
     Nunito_400Regular:      require("@expo-google-fonts/nunito/400Regular/Nunito_400Regular.ttf"),
   });
 
-  // Hide splash screen once fonts are ready (or if there's an error)
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Hide the native splash as soon as fonts are ready, then show our animated one
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  // Block rendering until fonts are loaded
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
   return (
-    // GestureHandlerRootView is required at the root for react-native-gesture-handler
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/*
-       * StatusBar style="light" pairs well with the dark background (#131F24).
-       * Change to "dark" if you switch to a light theme.
-       */}
       <StatusBar style="light" />
 
       <Stack
@@ -69,6 +123,8 @@ export default function RootLayout() {
         <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="profile" options={{ animation: "slide_from_left" }} />
       </Stack>
+
+      {!splashDone && <AnimatedSplash onDone={() => setSplashDone(true)} />}
     </GestureHandlerRootView>
   );
 }
