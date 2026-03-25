@@ -330,6 +330,39 @@ export default function HomeScreen() {
 
             </View>
           </Animated.View>
+
+          {/* ── Lernen & Regeln ──────────────────────────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(5 * 130).duration(500)}>
+            <View style={styles.modeRow}>
+
+              {/* Lernen */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push("/lernen" as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Lernen"
+                style={[styles.modeCard, styles.modeCardLernen]}
+              >
+                <Text style={styles.modeCardTitle}>Lernen</Text>
+              </Pressable>
+
+              {/* Wörterbuch */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push("/woerterbuch" as never);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Wörterbuch"
+                style={[styles.modeCard, styles.modeCardRegeln]}
+              >
+                <Text style={styles.modeCardTitle}>Wörterbuch</Text>
+              </Pressable>
+
+            </View>
+          </Animated.View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -474,6 +507,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#1CB0F6",
     borderBottomColor: "#0A8FCF",
     shadowColor: "#1CB0F6",
+  },
+  modeCardLernen: {
+    backgroundColor: "#7C3AED",
+    borderBottomColor: "#5B21B6",
+    shadowColor: "#7C3AED",
+  },
+  modeCardRegeln: {
+    backgroundColor: "#059669",
+    borderBottomColor: "#047857",
+    shadowColor: "#059669",
   },
   modeCardTitle: {
     fontFamily: "GravitasOne_400Regular",

@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useProgress } from "@/hooks/useProgress"; // for streak only — mastery saved in game screen
 import { useStreak } from "@/hooks/useStreak";
+import { useRounds } from "@/hooks/useRounds";
 import { useSound } from "@/hooks/useSound";
 import { consumePendingResult, type PendingRoundResult } from "@/utils/resultsStore";
 import type { SentenceResult } from "@/hooks/useGameEngine";
@@ -172,6 +173,7 @@ export default function ResultsScreen() {
   // ── Hooks ──────────────────────────────────────────────────────────────────
   useProgress(); // keep hook mounted so mastery state stays live
   const { bumpStreak }        = useStreak();
+  const { incrementRounds }   = useRounds();
   const { playLevelComplete } = useSound();
 
   // ── Save once on mount ─────────────────────────────────────────────────────
@@ -179,6 +181,7 @@ export default function ResultsScreen() {
   useEffect(() => {
     if (savedRef.current) return;
     savedRef.current = true;
+    incrementRounds();
     if (stars >= 1) {
       bumpStreak();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
