@@ -15,7 +15,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { FontAwesome6 } from "@expo/vector-icons";
-import { useProgress, type SubLevelRecord } from "@/hooks/useProgress";
+import { useProgress } from "@/hooks/useProgress";
 import { useStreak } from "@/hooks/useStreak";
 import { useSound } from "@/hooks/useSound";
 
@@ -65,15 +65,17 @@ const LEVEL_DEFS: LevelDef[] = [
 interface LevelCardProps {
   def: LevelDef;
   animationIndex: number;
-  records: SubLevelRecord[];
+  /** One entry per verb: 0 = never seen, 1–2 = in progress, 3+ = mastered */
+  verbCounts: number[];
+  stars: number;
   unlocked: boolean;
   onPress: () => void;
 }
 
-function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCardProps) {
-  const completedCount = records.filter((r) => r.completed).length;
-  const totalStars = records.reduce((sum, r) => sum + r.bestStars, 0);
-  const progressPct: `${number}%` = `${(completedCount / 5) * 100}%`;
+function LevelCard({ def, animationIndex, verbCounts, stars, unlocked, onPress }: LevelCardProps) {
+  const masteredVerbs = verbCounts.filter((c) => c >= 3).length;
+  const totalVerbs = verbCounts.length;
+  const isFullyMastered = masteredVerbs === totalVerbs && totalVerbs > 0;
   const dimmed = !unlocked;
 
   return (
@@ -120,7 +122,7 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
                       key={i}
                       style={{
                         fontSize: 18,
-                        color: dimmed ? "#3A5060" : totalStars >= i * 5 ? "#001d3d" : "rgba(0,29,61,0.3)",
+                        color: dimmed ? "#3A5060" : stars >= i ? "#001d3d" : "rgba(0,29,61,0.3)",
                       }}
                     >
                       ★
@@ -137,22 +139,26 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
             </View>
           </View>
 
-          {/* Progress bar + counter */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.progressTrack, { backgroundColor: dimmed ? "#111820" : "rgba(0,29,61,0.2)" }]}>
-              <View
-                style={{
-                  width: progressPct,
-                  height: "100%",
-                  backgroundColor: dimmed ? "#2C4551" : "rgba(0,29,61,0.5)",
-                  borderRadius: 999,
-                }}
-              />
-            </View>
-            <Text style={[styles.progressLabel, { color: dimmed ? "#3A5060" : "rgba(0,29,61,0.7)" }]}>
-              {completedCount}/5
-            </Text>
-          </View>
+          {/* Three-segment bar: green=mastered, orange=in progress, gray=unseen */}
+          {(() => {
+            const inProgress = verbCounts.filter((c) => c >= 1 && c < 3).length;
+            const unseen     = verbCounts.filter((c) => c === 0).length;
+            const greenPct  = totalVerbs === 0 ? 0 : (masteredVerbs / totalVerbs) * 100;
+            const orangePct = totalVerbs === 0 ? 0 : (inProgress    / totalVerbs) * 100;
+            const grayPct   = totalVerbs === 0 ? 0 : (unseen        / totalVerbs) * 100;
+            return (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ flex: 1, height: 11, borderRadius: 999, overflow: "hidden", flexDirection: "row" }}>
+                  {greenPct  > 0 && <View style={{ width: `${greenPct}%`,  height: "100%", backgroundColor: dimmed ? "#2C4551" : "#58CC02" }} />}
+                  {orangePct > 0 && <View style={{ width: `${orangePct}%`, height: "100%", backgroundColor: dimmed ? "#2C4551" : "#1A5276" }} />}
+                  {grayPct   > 0 && <View style={{ width: `${grayPct}%`,   height: "100%", backgroundColor: dimmed ? "#2C4551" : "rgba(255,255,255,0.25)" }} />}
+                </View>
+                <Text style={[styles.progressLabel, { color: dimmed ? "#3A5060" : "rgba(0,29,61,0.7)" }]}>
+                  {isFullyMastered ? "✓" : `${masteredVerbs}/${totalVerbs}`}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
       </Pressable>
     </Animated.View>
@@ -164,7 +170,8 @@ function LevelCard({ def, animationIndex, records, unlocked, onPress }: LevelCar
 export default function HomeScreen() {
   const router = useRouter();
   const { unlocked } = useLocalSearchParams<{ unlocked?: string }>();
-  const { getLevelProgress, isLevelUnlocked, reloadProgress } = useProgress();
+  const { getVerbCounts, getLevelStars, isLevelUnlocked, reloadProgress } = useProgress();
+
   const { currentStreak } = useStreak();
   const { playUnlock } = useSound();
 
@@ -284,7 +291,8 @@ export default function HomeScreen() {
               key={def.level}
               def={def}
               animationIndex={i}
-              records={getLevelProgress(def.level)}
+              verbCounts={getVerbCounts(def.level)}
+              stars={getLevelStars(def.level)}
               unlocked={isLevelUnlocked(def.level)}
               onPress={() => handleCardPress(def.level)}
             />

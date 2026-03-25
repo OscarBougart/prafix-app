@@ -23,7 +23,6 @@ import { useGameEngine } from "@/hooks/useGameEngine";
 import { useProgress } from "@/hooks/useProgress";
 import { useSound } from "@/hooks/useSound";
 import { useFavorites } from "@/hooks/useFavorites";
-import { useWrongAnswers } from "@/hooks/useWrongAnswers";
 import { setPendingResult } from "@/utils/resultsStore";
 import { allSentences } from "@/data/sentences";
 import type { Sentence } from "@/data/types";
@@ -32,9 +31,9 @@ import type { Sentence } from "@/data/types";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const H_PAD = 20;
-const CLOSE_W = 40;
+const CLOSE_W = 44;
 const SCORE_W = 68;
-const BAR_GAPS = 8 * 2; // gap on each side of the bar
+const BAR_GAPS = 8 * 2;
 const PROGRESS_TRACK_W = SCREEN_W - H_PAD * 2 - CLOSE_W - SCORE_W - BAR_GAPS;
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -109,11 +108,11 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
     if (btnState === "wrong") {
       shakeX.value = withSequence(
         withTiming(-12, { duration: 55 }),
-        withTiming(12, { duration: 55 }),
-        withTiming(-9, { duration: 55 }),
-        withTiming(9,  { duration: 55 }),
-        withTiming(-5, { duration: 55 }),
-        withTiming(0,  { duration: 55 }),
+        withTiming(12,  { duration: 55 }),
+        withTiming(-9,  { duration: 55 }),
+        withTiming(9,   { duration: 55 }),
+        withTiming(-5,  { duration: 55 }),
+        withTiming(0,   { duration: 55 }),
       );
     }
   }, [btnState]);
@@ -122,14 +121,14 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
     transform: [{ translateX: shakeX.value }],
   }));
 
-  const isActive   = btnState === "correct" || btnState === "hint";
-  const isWrong    = btnState === "wrong";
-  const isDefault  = btnState === "idle" || btnState === "dimmed";
+  const isActive  = btnState === "correct" || btnState === "hint";
+  const isWrong   = btnState === "wrong";
+  const isDefault = btnState === "idle" || btnState === "dimmed";
 
-  const bgColor      = isActive ? C.correct : isWrong ? C.wrong : C.btnYellow;
-  const borderColor  = isActive ? C.correctDark : isWrong ? C.wrongDark : C.btnYellowDk;
-  const labelColor   = isDefault ? C.bg : C.foreground;
-  const opacity      = btnState === "dimmed" ? 0.42 : 1;
+  const bgColor     = isActive ? C.correct : isWrong ? C.wrong : C.btnYellow;
+  const borderColor = isActive ? C.correctDark : isWrong ? C.wrongDark : C.btnYellowDk;
+  const labelColor  = isDefault ? C.bg : C.foreground;
+  const opacity     = btnState === "dimmed" ? 0.42 : 1;
 
   return (
     <Animated.View style={[{ flex: 1 }, shakeStyle]}>
@@ -149,16 +148,7 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
   );
 }
 
-// ─── SentenceDisplay ─────────────────────────────────────────────────────────
-//
-// Renders the sentence as nested <Text> components.
-// Blank slots are displayed inline:
-//   • idle    →  " ___ "  (muted colour)
-//   • correct →  " auf- " (green, bold)
-//   • wrong   →  " auf- " (red, bold)
-//
-// For Präsens the conjugated verb stem also fills its slot (auto, blue/bold).
-// For Perfekt / Nebensatz the text after the blank (= stem) is bold blue.
+// ─── SentenceDisplay ──────────────────────────────────────────────────────────
 
 interface SentenceDisplayProps {
   sentence: Sentence;
@@ -187,26 +177,21 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
   );
 
   if (sentence.tense === "praesens") {
-    // parts = [before_verb_blank, between_blanks, after_prefix_blank]
     return (
       <Text style={S.sentenceText}>
         {parts[0]}
-        {/* Auto-filled verb stem */}
         <Text style={S.verbChipText}>{sentence.conjugatedStem}</Text>
         {parts[1]}
-        {/* Interactive prefix blank */}
         {blankNode}
         {parts[2]}
       </Text>
     );
   }
 
-  // Perfekt / Nebensatz — parts = [before_prefix_blank, stem_text]
   return (
     <Text style={S.sentenceText}>
       {parts[0]}
       {blankNode}
-      {/* Verb stem/participle after the blank — styled bold blue */}
       <Text style={S.stemChipText}>{parts[1]}</Text>
     </Text>
   );
@@ -216,14 +201,27 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
 
 interface GameRoundProps {
   level: 1 | 2 | 3 | 4;
-  subLevel: 1 | 2 | 3 | 4 | 5;
-  customSentences?: Sentence[];
+  sentences: Sentence[];
+  trackMastery: boolean;
 }
 
-function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
-  const router = useRouter();
+function GameRound({ level, sentences, trackMastery }: GameRoundProps) {
+  const router   = useRouter();
   const isMounted = useRef(true);
   useEffect(() => () => { isMounted.current = false; }, []);
+
+  const { updateVerbMastery } = useProgress();
+
+  // Called at round end with net tally per verb
+  const handleMasteryFlush = useCallback(
+    (tally: Record<string, "correct" | "wrong" | "tie">) => {
+      for (const [verb, result] of Object.entries(tally)) {
+        if (result === "tie") continue;
+        updateVerbMastery(verb, result === "correct");
+      }
+    },
+    [updateVerbMastery],
+  );
 
   const {
     currentSentence,
@@ -234,9 +232,8 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
     submitAnswer,
     stars,
     results,
-  } = useGameEngine({ level, subLevel, customSentences });
+  } = useGameEngine({ sentences, trackMastery, onMasteryFlush: handleMasteryFlush });
 
-  // Hold last sentence visible during the result-animation delay
   const [displayedSentence, setDisplayedSentence] = useState<Sentence | null>(
     currentSentence,
   );
@@ -244,7 +241,6 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
     if (currentSentence !== null) setDisplayedSentence(currentSentence);
   }, [currentSentence?.id]);
 
-  // Shuffle options once per sentence
   const [options, setOptions] = useState<string[]>(["", "", "", ""]);
   useEffect(() => {
     if (currentSentence) {
@@ -254,21 +250,16 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
     }
   }, [currentSentence?.id]);
 
-  // ── Answer state ────────────────────────────────────────────────────────────
-  const [answer, setAnswer] = useState<AnswerState>(IDLE);
-  const { playCorrect, playWrong } = useSound();
+  const [answer, setAnswer]           = useState<AnswerState>(IDLE);
+  const { playCorrect, playWrong }    = useSound();
   const { isFavorite, toggleFavorite } = useFavorites();
-  const { addWrongAnswer } = useWrongAnswers();
 
-  // ── Translation toggle — reset on each new sentence ─────────────────────────
   const [showTranslation, setShowTranslation] = useState(false);
   useEffect(() => {
     setShowTranslation(false);
   }, [currentSentence?.id]);
 
-  // ── Animations ──────────────────────────────────────────────────────────────
-
-  // Progress bar (pixel width)
+  // ── Progress bar ────────────────────────────────────────────────────────────
   const progressAnim = useSharedValue(0);
   useEffect(() => {
     progressAnim.value = withTiming(
@@ -276,38 +267,30 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
       { duration: 500 },
     );
   }, [sentenceIndex]);
-  const progressStyle = useAnimatedStyle(() => ({
-    width: progressAnim.value,
-  }));
+  const progressStyle = useAnimatedStyle(() => ({ width: progressAnim.value }));
 
-  // Sentence card scale — pulses on correct answer
+  // ── Card scale pulse ─────────────────────────────────────────────────────────
   const cardScale = useSharedValue(1);
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: cardScale.value }],
   }));
 
-  // ── Navigate when finished ──────────────────────────────────────────────────
+  // ── Navigate when finished ───────────────────────────────────────────────────
   useEffect(() => {
     if (gameState === "finished") {
-      setPendingResult({ level, subLevel, score, stars, results });
+      setPendingResult({ level, subLevel: 1, score, stars, results });
       router.replace({
         pathname: "/results",
-        params: {
-          level:    String(level),
-          subLevel: String(subLevel),
-          score:    String(score),
-          stars:    String(stars),
-        },
+        params: { level: String(level), score: String(score), stars: String(stars) },
       });
     }
   }, [gameState]);
 
-  // ── Handle tap ──────────────────────────────────────────────────────────────
+  // ── Handle tap ───────────────────────────────────────────────────────────────
   const handleOptionPress = useCallback(
     (prefix: string) => {
       if (!currentSentence) return;
 
-      // Answer already shown — any tap advances to next sentence
       if (answer.phase === "answering") {
         submitAnswer(answer.selectedPrefix);
         setAnswer(IDLE);
@@ -323,10 +306,6 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
         correctPrefix: currentSentence.correctPrefix,
       });
 
-      // Track wrong answers
-      if (!isCorrect) addWrongAnswer(currentSentence.id);
-
-      // Sound + haptic
       if (isCorrect) { playCorrect(); } else { playWrong(); }
       Haptics.notificationAsync(
         isCorrect
@@ -334,19 +313,16 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
           : Haptics.NotificationFeedbackType.Error,
       );
 
-      // Card pulse on correct
       if (isCorrect) {
         cardScale.value = withSequence(
           withTiming(1.03, { duration: 110 }),
-          withSpring(1,    { damping: 14, stiffness: 250 }),
+          withSpring(1, { damping: 14, stiffness: 250 }),
         );
       }
-      // Both correct and wrong: wait for user tap to advance (handled above)
     },
-    [answer, currentSentence, submitAnswer, cardScale, playCorrect, playWrong, addWrongAnswer],
+    [answer, currentSentence, submitAnswer, cardScale, playCorrect, playWrong],
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   if (!displayedSentence) return null;
   const isAnswering = answer.phase === "answering";
 
@@ -356,8 +332,6 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
 
       {/* ── Top bar ── */}
       <View style={[S.topBar, { paddingHorizontal: H_PAD }]}>
-
-        {/* Close button */}
         <Pressable
           onPress={() => router.back()}
           style={S.closeBtn}
@@ -368,12 +342,12 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
           <Text style={S.closeBtnText}>✕</Text>
         </Pressable>
 
-        {/* Progress track */}
         <View style={S.progressTrack}>
-          <Animated.View style={[S.progressFill, progressStyle]} />
+          <Animated.View style={[S.progressFill, progressStyle]}>
+            <View style={S.progressShine} />
+          </Animated.View>
         </View>
 
-        {/* Score badge */}
         <View style={S.scoreBadge}>
           <Text style={S.scoreNum}>{score}</Text>
           <Entypo name="star" size={30} color={C.btnYellow} style={{ marginBottom: 6 }} />
@@ -382,11 +356,8 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
 
       {/* ── Sentence card ── */}
       <View className="flex-1 px-5 justify-center">
-        {/* Outer view owns the enter animation; inner view owns the scale transform. */}
-        {/* Combining both on one Animated.View causes a Reanimated conflict warning. */}
         <Animated.View key={displayedSentence.id} entering={FadeInDown.duration(350).springify()}>
 
-          {/* Above-card row: sentence counter left, heart right */}
           <View style={S.aboveCardRow}>
             <Text style={S.sentenceCounter}>
               {sentenceIndex + 1} / {totalSentences}
@@ -411,7 +382,6 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
             <SentenceDisplay sentence={displayedSentence} answer={answer} />
           </Animated.View>
 
-          {/* Translate button + translation below card, right-aligned */}
           <View style={S.translationRow}>
             {showTranslation && (
               <Text style={[S.translationText, { flex: 1 }]}>{displayedSentence.translation}</Text>
@@ -459,21 +429,16 @@ function GameRound({ level, subLevel, customSentences }: GameRoundProps) {
 }
 
 // ─── GameScreen (outer shell) ─────────────────────────────────────────────────
-//
-// Waits for progress to load, then picks the first incomplete subLevel for the
-// given level. If all 5 subLevels are complete, replays from subLevel 1.
 
 export default function GameScreen() {
-  const { level: levelParam, subLevel: subLevelParam, mode } = useLocalSearchParams<{
+  const { level: levelParam, mode } = useLocalSearchParams<{
     level: string;
-    subLevel?: string;
     mode?: "favorites" | "wrong";
   }>();
   const level = Math.max(1, Math.min(4, parseInt(levelParam ?? "1", 10))) as 1 | 2 | 3 | 4;
 
-  const { isLoading, getLevelProgress } = useProgress();
+  const { isLoading, selectSentencesForRound, getMistakes } = useProgress();
   const { favoriteIds } = useFavorites();
-  const { wrongAnswerIds } = useWrongAnswers();
 
   if (isLoading) {
     return (
@@ -484,43 +449,60 @@ export default function GameScreen() {
     );
   }
 
-  // Custom modes: favorites or wrong answers
-  if (mode === "favorites" || mode === "wrong") {
-    const ids = mode === "favorites" ? favoriteIds : wrongAnswerIds;
-    const customSentences = allSentences.filter((s) => ids.has(s.id));
-
+  // ── Favoriten mode ───────────────────────────────────────────────────────────
+  if (mode === "favorites") {
+    const customSentences = allSentences.filter((s) => favoriteIds.has(s.id));
     if (customSentences.length === 0) {
       return (
         <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={["top", "bottom"]}>
           <Stack.Screen options={{ headerShown: false }} />
           <Text className="text-foreground text-lg" style={{ fontFamily: "Nunito_700Bold", marginBottom: 8 }}>
-            {mode === "favorites" ? "Keine Favoriten" : "Keine Fehler gespeichert"}
+            Keine Favoriten
           </Text>
           <Text className="text-muted text-sm" style={{ fontFamily: "Nunito_400Regular" }}>
-            {mode === "favorites" ? "Markiere Sätze im Spiel mit ♥" : "Spiele eine Runde, um Fehler zu speichern"}
+            Markiere Sätze im Spiel mit ♥
           </Text>
         </SafeAreaView>
       );
     }
-
-    return <GameRound level={1} subLevel={1} customSentences={customSentences} />;
+    return <GameRound level={level} sentences={customSentences} trackMastery={false} />;
   }
 
-  let subLevel: 1 | 2 | 3 | 4 | 5;
-  if (subLevelParam !== undefined) {
-    subLevel = Math.max(1, Math.min(5, parseInt(subLevelParam, 10))) as 1 | 2 | 3 | 4 | 5;
-  } else {
-    const records = getLevelProgress(level);
-    subLevel = (records.find((r) => !r.completed)?.subLevel ?? 1) as 1 | 2 | 3 | 4 | 5;
+  // ── Fehler üben mode ─────────────────────────────────────────────────────────
+  if (mode === "wrong") {
+    const mistakes = getMistakes();
+    if (mistakes.length === 0) {
+      return (
+        <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={["top", "bottom"]}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <Text className="text-foreground text-lg" style={{ fontFamily: "Nunito_700Bold", marginBottom: 8 }}>
+            Keine Fehler gespeichert
+          </Text>
+          <Text className="text-muted text-sm" style={{ fontFamily: "Nunito_400Regular" }}>
+            Spiele eine Runde, um Fehler zu speichern
+          </Text>
+        </SafeAreaView>
+      );
+    }
+    // Pick one random sentence per mistake verb (any level)
+    const sentences: Sentence[] = [];
+    for (const m of mistakes) {
+      const pool = allSentences.filter((s) => s.verbInfinitive === m.verbInfinitive);
+      if (pool.length > 0) {
+        sentences.push(pool[Math.floor(Math.random() * pool.length)]!);
+      }
+    }
+    return <GameRound level={level} sentences={sentences} trackMastery={false} />;
   }
 
-  return <GameRound level={level} subLevel={subLevel} />;
+  // ── Normal level play ────────────────────────────────────────────────────────
+  const sentences = selectSentencesForRound(level);
+  return <GameRound level={level} sentences={sentences} trackMastery={true} />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const S = StyleSheet.create({
-  // Top bar
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -537,7 +519,7 @@ const S = StyleSheet.create({
   closeBtnText: {
     fontFamily: "Nunito_700Bold",
     color: C.muted,
-    fontSize: 18,
+    fontSize: 24,
   },
   progressTrack: {
     width: PROGRESS_TRACK_W,
@@ -550,6 +532,16 @@ const S = StyleSheet.create({
     height: "100%",
     backgroundColor: C.blue,
     borderRadius: 99,
+    overflow: "hidden",
+  },
+  progressShine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
+    borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.22)",
   },
   scoreBadge: {
     width: SCORE_W,
@@ -566,16 +558,12 @@ const S = StyleSheet.create({
   scoreStar: {
     fontSize: 16,
   },
-
-  // Sentence counter
   sentenceCounter: {
     fontFamily: "Nunito_700Bold",
     color: C.muted,
     fontSize: 13,
     textAlign: "right",
   },
-
-  // Sentence card
   sentenceCard: {
     backgroundColor: C.surface,
     borderRadius: 20,
@@ -583,7 +571,6 @@ const S = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     gap: 14,
-    // Subtle shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -596,13 +583,11 @@ const S = StyleSheet.create({
     fontSize: 20,
     lineHeight: 30,
   },
-  // Verb stem chip (Präsens: auto-filled first blank)
   verbChipText: {
     fontFamily: "Nunito_700Bold",
     color: C.stemColor,
     fontSize: 20,
   },
-  // Stem text after prefix blank (Perfekt / Nebensatz)
   stemChipText: {
     fontFamily: "Nunito_700Bold",
     color: C.stemColor,
@@ -641,8 +626,6 @@ const S = StyleSheet.create({
     textAlign: "center",
     marginTop: 6,
   },
-
-  // Options
   optionsContainer: {
     gap: 10,
     paddingTop: 8,

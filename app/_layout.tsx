@@ -57,7 +57,7 @@ function AnimatedSplash({ onDone }: { onDone: () => void }) {
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
-    <Pressable onPress={skip} style={{ flex: 1 }}>
+    <Pressable onPress={skip} style={StyleSheet.absoluteFillObject}>
       <Animated.View style={[splashStyles.root, animStyle]}>
         <Text style={splashStyles.title}>
           <Text style={{ color: "#1CB0F6" }}>Prä</Text>

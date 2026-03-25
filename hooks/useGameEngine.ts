@@ -1,5 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
-import { allSentences } from "@/data/sentences";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type { Sentence } from "@/data/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,53 +19,50 @@ export type GameState = "playing" | "finished";
 export interface GameEngineReturn {
   /** The sentence the player must answer right now. Null when finished. */
   currentSentence: Sentence | null;
-  /** 0-based index of the current sentence (0–9). Equals totalSentences when done. */
+  /** 0-based index of the current sentence (0–9). */
   sentenceIndex: number;
   /** Number of correct answers so far. */
   score: number;
-  /** Always 10. */
+  /** Always ROUND_SIZE (10). */
   totalSentences: number;
-  /** "playing" until all 10 sentences are answered. */
+  /** "playing" until all sentences are answered. */
   gameState: GameState;
-  /** Submit a prefix guess. Returns { correct, correctAnswer } and advances to next sentence. */
+  /**
+   * Submit a prefix guess.
+   * - Records the answer.
+   * - Accumulates the per-verb tally for this round.
+   * - On the LAST sentence, flushes all verb tallies to mastery storage
+   *   (only when trackMastery is true).
+   * Returns { correct, correctAnswer }.
+   */
   submitAnswer: (prefix: string) => SubmitResult;
-  /** 0–3 stars. Only meaningful when gameState === "finished". */
+  /** 0–3 stars based on score. */
   stars: number;
-  /** Full answer record. Only complete when gameState === "finished". */
+  /** Full answer record. Complete when gameState === "finished". */
   results: SentenceResult[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Fisher-Yates shuffle — uniform random order. */
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/**
- * Pick 10 sentences for the given level+subLevel combination.
- * There is exactly one sentence per verb at each subLevel, so filtering
- * level + subLevel yields precisely 10 sentences which we then shuffle.
- */
-function pickSentences(level: 1 | 2 | 3 | 4, subLevel: 1 | 2 | 3 | 4 | 5): Sentence[] {
-  const pool = allSentences.filter(
-    (s) => s.level === level && s.subLevel === subLevel,
-  );
-  return shuffle(pool);
-}
-
-/** Star rating: 7–8 correct = 1 ⭐, 9 = 2 ⭐⭐, 10 = 3 ⭐⭐⭐ */
+/** Star rating: ≥9 = 2★, 10 = 3★, ≥7 = 1★, else 0 */
 function calculateStars(score: number): number {
   if (score === 10) return 3;
-  if (score === 9) return 2;
-  if (score === 8) return 2;
-  if (score >= 7) return 1;
+  if (score >= 9)   return 2;
+  if (score >= 7)   return 1;
   return 0;
+}
+
+// ─── Per-verb round tally ─────────────────────────────────────────────────────
+//
+// Within a single round, we accumulate correct/wrong counts per verb.
+// At round end we apply the net-result rule:
+//   correct > wrong  → +1 correctCount
+//   wrong > correct  → +1 incorrectCount
+//   tie (equal)      → no change
+
+interface VerbTally {
+  correct: number;
+  wrong: number;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -74,60 +70,79 @@ function calculateStars(score: number): number {
 /**
  * Core game loop for a single PräFix round.
  *
- * Usage:
- *   const { currentSentence, submitAnswer, score, gameState, stars, results } =
- *     useGameEngine({ level: 1, subLevel: 1 });
+ * @param sentences  Pre-selected sentences to play (from selectSentencesForRound
+ *                   or customSentences for Favoriten/Fehler üben).
+ * @param trackMastery  When true, flushes verb tallies to mastery storage at
+ *                      round end. False for Favoriten / Fehler üben modes.
+ * @param onMasteryFlush  Called once at end with the net tally map so the
+ *                        caller (game screen) can call updateVerbMastery.
  */
 export function useGameEngine({
-  level,
-  subLevel,
-  customSentences,
+  sentences,
+  trackMastery = true,
+  onMasteryFlush,
 }: {
-  level: 1 | 2 | 3 | 4;
-  subLevel: 1 | 2 | 3 | 4 | 5;
-  customSentences?: Sentence[];
+  sentences: Sentence[];
+  trackMastery?: boolean;
+  onMasteryFlush?: (tally: Record<string, "correct" | "wrong" | "tie">) => void;
 }): GameEngineReturn {
-  // Sentences are picked once at mount. Changing level/subLevel requires
-  // remounting the component (or adding a key prop on the parent).
-  const [sentences] = useState<Sentence[]>(() =>
-    customSentences && customSentences.length > 0
-      ? shuffle(customSentences)
-      : pickSentences(level, subLevel),
-  );
-
-  const [index, setIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [results, setResults] = useState<SentenceResult[]>([]);
+  const [index, setIndex]         = useState(0);
+  const [score, setScore]         = useState(0);
+  const [results, setResults]     = useState<SentenceResult[]>([]);
   const [gameState, setGameState] = useState<GameState>("playing");
 
-  const totalSentences = sentences.length; // always 10
+  // Per-verb tally for this round — stored in a ref so submitAnswer callback
+  // doesn't need to re-create on every answer.
+  const tallyRef = useRef<Record<string, VerbTally>>({});
+
+  const totalSentences = sentences.length;
 
   const currentSentence: Sentence | null =
     gameState === "playing" ? (sentences[index] ?? null) : null;
 
   const submitAnswer = useCallback(
     (prefix: string): SubmitResult => {
-      // Guard: ignore calls after the game has ended
       if (gameState === "finished" || index >= totalSentences) {
         return { correct: false, correctAnswer: "" };
       }
 
       const sentence = sentences[index];
-      const correct = prefix === sentence.correctPrefix;
+      const correct  = prefix === sentence.correctPrefix;
       const result: SentenceResult = { sentence, answeredPrefix: prefix, correct };
 
-      // Batch all state updates in one render
-      const nextIndex = index + 1;
+      // ── Accumulate verb tally ──────────────────────────────────────────────
+      const verb = sentence.verbInfinitive;
+      const prev = tallyRef.current[verb] ?? { correct: 0, wrong: 0 };
+      tallyRef.current[verb] = {
+        correct: prev.correct + (correct ? 1 : 0),
+        wrong:   prev.wrong   + (correct ? 0 : 1),
+      };
+
+      const nextIndex  = index + 1;
       const isFinished = nextIndex >= totalSentences;
 
-      setResults((prev) => [...prev, result]);
-      if (correct) setScore((prev) => prev + 1);
+      setResults((r) => [...r, result]);
+      if (correct) setScore((s) => s + 1);
       setIndex(nextIndex);
-      if (isFinished) setGameState("finished");
+
+      if (isFinished) {
+        setGameState("finished");
+
+        // ── Flush mastery on last answer ───────────────────────────────────
+        if (trackMastery && onMasteryFlush) {
+          const net: Record<string, "correct" | "wrong" | "tie"> = {};
+          for (const [v, t] of Object.entries(tallyRef.current)) {
+            if (t.correct > t.wrong)       net[v] = "correct";
+            else if (t.wrong > t.correct)  net[v] = "wrong";
+            else                           net[v] = "tie";
+          }
+          onMasteryFlush(net);
+        }
+      }
 
       return { correct, correctAnswer: sentence.correctPrefix };
     },
-    [gameState, index, sentences, totalSentences],
+    [gameState, index, sentences, totalSentences, trackMastery, onMasteryFlush],
   );
 
   const stars = useMemo(

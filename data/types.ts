@@ -1,5 +1,14 @@
 // ─── Core domain types for PräFix ────────────────────────────────────────────
 
+export interface VerbMastery {
+  verbInfinitive: string;
+  level: 1 | 2 | 3 | 4;
+  correctCount: number;
+  incorrectCount: number;
+  lastSeen: string; // ISO date string
+  mastered: boolean; // true when correctCount >= 3
+}
+
 export interface SeparableVerb {
   /** Full infinitive, e.g. "aufmachen" */
   infinitive: string;

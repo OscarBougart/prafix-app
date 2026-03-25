@@ -1,232 +1,341 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { storage } from "@/utils/storage";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface SubLevelProgress {
-  /** Best correct-answer count out of 10 across all attempts. */
-  bestScore: number;
-  /** Best star rating (0–3) across all attempts. */
-  bestStars: number;
-  /** Total number of times this subLevel has been played. */
-  attempts: number;
-  /** True once the player earns ≥ 1 star on any attempt. */
-  completed: boolean;
-}
-
-/** One entry per subLevel (1–5), always exactly 5 items. */
-export interface SubLevelRecord extends SubLevelProgress {
-  subLevel: 1 | 2 | 3 | 4 | 5;
-}
-
-// Stored in AsyncStorage as a nested object keyed by stringified level/subLevel.
-// Using string keys for reliable JSON round-trip serialization.
-type LevelData = Partial<Record<string, SubLevelProgress>>;
-type ProgressData = Partial<Record<string, LevelData>>;
-
-export interface ProgressReturn {
-  /** True while the initial load from AsyncStorage is in progress. */
-  isLoading: boolean;
-  /**
-   * Persist the result of a finished round. Updates local state immediately
-   * and writes to AsyncStorage asynchronously.
-   */
-  saveRoundResult: (
-    level: 1 | 2 | 3 | 4,
-    subLevel: 1 | 2 | 3 | 4 | 5,
-    score: number,
-    stars: number,
-  ) => Promise<void>;
-  /**
-   * Returns an array of 5 SubLevelRecords (one per subLevel) for the given
-   * level. Missing entries default to zeroed-out progress.
-   */
-  getLevelProgress: (level: 1 | 2 | 3 | 4) => SubLevelRecord[];
-  /**
-   * Level 1 is always unlocked. Level N (N > 1) unlocks once every subLevel
-   * of level N-1 is completed (bestStars ≥ 1).
-   */
-  isLevelUnlocked: (level: 1 | 2 | 3 | 4) => boolean;
-  /** Sum of bestStars across every subLevel in every level. Max = 4 × 5 × 3 = 60. */
-  getTotalStars: () => number;
-  /** Wipe all progress. Used for dev resets — prompt the user first. */
-  resetProgress: () => Promise<void>;
-  /** Re-read progress from AsyncStorage. Call via useFocusEffect on the home screen. */
-  reloadProgress: () => Promise<void>;
-}
+import { allSentences } from "@/data/sentences";
+import type { Sentence, VerbMastery } from "@/data/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PROGRESS_KEY = "prafix:progress";
+const MASTERY_KEY   = "prafix:verb_mastery";
+const UNLOCKED_KEY  = "prafix:unlocked_levels";
+const MASTERY_THRESHOLD = 3;       // correctCount needed to master a verb
+const UNLOCK_THRESHOLD  = 0.8;     // 80% mastered to unlock next level
+const ROUND_SIZE        = 10;
+const REVIEW_SLOTS      = 2;       // mastered verbs sprinkled in per round
 
-const SUB_LEVELS = [1, 2, 3, 4, 5] as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const DEFAULT_SUB_LEVEL_PROGRESS: SubLevelProgress = {
-  bestScore: 0,
-  bestStars: 0,
-  attempts: 0,
-  completed: false,
-};
+/** Keyed by verbInfinitive */
+type MasteryStore = Record<string, VerbMastery>;
+
+export interface LevelProgress {
+  totalVerbs: number;
+  masteredVerbs: number;
+  percentage: number; // 0–1
+}
+
+export interface ProgressReturn {
+  isLoading: boolean;
+  /** Update mastery for a verb after an answer. */
+  updateVerbMastery: (verbInfinitive: string, correct: boolean) => Promise<void>;
+  /** Get mastery record for one verb, or null if never seen. */
+  getVerbMastery: (verbInfinitive: string) => VerbMastery | null;
+  /** correctCount (capped at 3) for each verb in the level, for rendering segmented progress. */
+  getVerbCounts: (level: 1 | 2 | 3 | 4) => number[];
+  /** Mastery stats for a whole level. */
+  getLevelProgress: (level: 1 | 2 | 3 | 4) => LevelProgress;
+  /** Level 1 always unlocked; others need prev level >= 80% mastered. */
+  isLevelUnlocked: (level: 1 | 2 | 3 | 4) => boolean;
+  /** All VerbMastery records where incorrectCount > 0 (for Fehler üben). */
+  getMistakes: () => VerbMastery[];
+  /** Total mastered verbs across all levels. */
+  getTotalMastered: () => number;
+  /** Star rating for a level: 1★ = 33%, 2★ = 66%, 3★ = 100% mastered. */
+  getLevelStars: (level: 1 | 2 | 3 | 4) => number;
+  /**
+   * Smart sentence selection for a round.
+   * Returns exactly ROUND_SIZE sentences using priority:
+   *   1. Wrong & unmastered verbs
+   *   2. Never-seen verbs
+   *   3. Stale (longest unseen) verbs
+   *   4. Mastered verbs as review (REVIEW_SLOTS)
+   */
+  selectSentencesForRound: (level: 1 | 2 | 3 | 4) => Sentence[];
+  resetProgress: () => Promise<void>;
+  reloadProgress: () => Promise<void>;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getSubLevel(data: LevelData | undefined, subLevel: number): SubLevelProgress {
-  return data?.[subLevel.toString()] ?? DEFAULT_SUB_LEVEL_PROGRESS;
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-function isLevelFullyCompleted(data: LevelData | undefined): boolean {
-  return SUB_LEVELS.every((sl) => getSubLevel(data, sl).completed);
+/** Pick one random sentence from a verb's pool for this level. */
+function pickOneSentence(verbInfinitive: string, level: 1 | 2 | 3 | 4): Sentence | null {
+  const pool = allSentences.filter(
+    (s) => s.verbInfinitive === verbInfinitive && s.level === level,
+  );
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
+/** All unique verb infinitives for a given level. */
+function verbsForLevel(level: 1 | 2 | 3 | 4): string[] {
+  return [...new Set(allSentences.filter((s) => s.level === level).map((s) => s.verbInfinitive))];
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-/**
- * Reads and writes PräFix progress to AsyncStorage.
- *
- * Usage:
- *   const { isLoading, saveRoundResult, getLevelProgress, isLevelUnlocked, getTotalStars } =
- *     useProgress();
- */
 export function useProgress(): ProgressReturn {
+  const [mastery, setMastery] = useState<MasteryStore>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [progress, setProgress] = useState<ProgressData>({});
+  const masteryRef = useRef<MasteryStore>({});
+  const unlockedLevelsRef = useRef<Set<number>>(new Set([1]));
 
-  // Mirror of progress in a ref so callbacks can read the latest value
-  // without needing to be re-created on every state change.
-  const progressRef = useRef<ProgressData>({});
+  // Keep ref in sync
   useEffect(() => {
-    progressRef.current = progress;
-  }, [progress]);
+    masteryRef.current = mastery;
+  }, [mastery]);
 
-  // ── Load from storage on mount ──────────────────────────────────────────────
+  // ── Load on mount ────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-    storage.get<ProgressData>(PROGRESS_KEY).then((stored) => {
+    Promise.all([
+      storage.get<MasteryStore>(MASTERY_KEY),
+      storage.get<number[]>(UNLOCKED_KEY),
+    ]).then(([storedMastery, storedUnlocked]) => {
       if (cancelled) return;
-      if (stored !== null) {
-        setProgress(stored);
-        progressRef.current = stored;
+      if (storedMastery !== null) {
+        setMastery(storedMastery);
+        masteryRef.current = storedMastery;
+      }
+      if (storedUnlocked !== null) {
+        unlockedLevelsRef.current = new Set(storedUnlocked);
       }
       setIsLoading(false);
     });
-    return () => {
-      cancelled = true;
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── updateVerbMastery ────────────────────────────────────────────────────────
+  const updateVerbMastery = useCallback(async (
+    verbInfinitive: string,
+    correct: boolean,
+  ): Promise<void> => {
+    const prev = masteryRef.current;
+
+    // Infer the verb's level from sentence data
+    const levelInferred = allSentences.find((s) => s.verbInfinitive === verbInfinitive)?.level ?? 1;
+
+    const existing: VerbMastery = prev[verbInfinitive] ?? {
+      verbInfinitive,
+      level: levelInferred as 1 | 2 | 3 | 4,
+      correctCount: 0,
+      incorrectCount: 0,
+      lastSeen: new Date().toISOString(),
+      mastered: false,
+    };
+
+    let { correctCount, incorrectCount, mastered } = existing;
+
+    if (correct) {
+      correctCount += 1;
+      if (correctCount >= MASTERY_THRESHOLD) mastered = true;
+    } else {
+      incorrectCount += 1;
+      // If already mastered, knock back to 2 (needs one more correct to re-master)
+      if (mastered) {
+        mastered = false;
+        correctCount = MASTERY_THRESHOLD - 1;
+      }
+    }
+
+    const updated: VerbMastery = {
+      ...existing,
+      correctCount,
+      incorrectCount,
+      mastered,
+      lastSeen: new Date().toISOString(),
+    };
+
+    const next: MasteryStore = { ...prev, [verbInfinitive]: updated };
+    setMastery(next);
+    masteryRef.current = next;
+    await storage.set(MASTERY_KEY, next);
+
+    // Check if any new level should be permanently unlocked
+    const prevUnlocked = unlockedLevelsRef.current;
+    let changed = false;
+    for (const lvl of [2, 3, 4] as const) {
+      if (!prevUnlocked.has(lvl)) {
+        const verbs = verbsForLevel((lvl - 1) as 1 | 2 | 3 | 4);
+        const mastered = verbs.filter((v) => next[v]?.mastered === true).length;
+        if (verbs.length > 0 && mastered / verbs.length >= UNLOCK_THRESHOLD) {
+          prevUnlocked.add(lvl);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      await storage.set(UNLOCKED_KEY, [...prevUnlocked]);
+    }
+  }, []);
+
+  // ── getVerbMastery ───────────────────────────────────────────────────────────
+  const getVerbMastery = useCallback((verbInfinitive: string): VerbMastery | null => {
+    return masteryRef.current[verbInfinitive] ?? null;
+  }, []);
+
+  // ── getVerbCounts ────────────────────────────────────────────────────────────
+  /** Returns correctCount (capped at 3) for each verb in the level, in stable order. */
+  const getVerbCounts = useCallback((level: 1 | 2 | 3 | 4): number[] => {
+    return verbsForLevel(level).map((v) =>
+      Math.min(masteryRef.current[v]?.correctCount ?? 0, MASTERY_THRESHOLD),
+    );
+  }, []);
+
+  // ── getLevelProgress ─────────────────────────────────────────────────────────
+  const getLevelProgress = useCallback((level: 1 | 2 | 3 | 4): LevelProgress => {
+    const verbs = verbsForLevel(level);
+    const totalVerbs = verbs.length;
+    const masteredVerbs = verbs.filter((v) => masteryRef.current[v]?.mastered === true).length;
+    return {
+      totalVerbs,
+      masteredVerbs,
+      percentage: totalVerbs === 0 ? 0 : masteredVerbs / totalVerbs,
     };
   }, []);
 
-  // ── saveRoundResult ─────────────────────────────────────────────────────────
-  const saveRoundResult = useCallback(
-    async (
-      level: 1 | 2 | 3 | 4,
-      subLevel: 1 | 2 | 3 | 4 | 5,
-      score: number,
-      stars: number,
-    ): Promise<void> => {
-      const prev = progressRef.current;
-      const levelKey = level.toString();
-      const subKey = subLevel.toString();
-      const levelData: LevelData = { ...(prev[levelKey] ?? {}) };
-      const existing = levelData[subKey] ?? DEFAULT_SUB_LEVEL_PROGRESS;
+  // ── isLevelUnlocked ──────────────────────────────────────────────────────────
+  const isLevelUnlocked = useCallback((level: 1 | 2 | 3 | 4): boolean => {
+    return unlockedLevelsRef.current.has(level);
+  }, []);
 
-      const updated: SubLevelProgress = {
-        bestScore: Math.max(existing.bestScore, score),
-        bestStars: Math.max(existing.bestStars, stars),
-        attempts: existing.attempts + 1,
-        completed: existing.completed || stars >= 1,
-      };
+  // ── getMistakes ──────────────────────────────────────────────────────────────
+  const getMistakes = useCallback((): VerbMastery[] => {
+    return Object.values(masteryRef.current).filter((m) => m.incorrectCount > 0);
+  }, []);
 
-      const newProgress: ProgressData = {
-        ...prev,
-        [levelKey]: { ...levelData, [subKey]: updated },
-      };
+  // ── getTotalMastered ─────────────────────────────────────────────────────────
+  const getTotalMastered = useCallback((): number => {
+    return Object.values(masteryRef.current).filter((m) => m.mastered).length;
+  }, []);
 
-      // Update local state immediately for responsive UI
-      setProgress(newProgress);
-      progressRef.current = newProgress;
+  // ── getLevelStars ────────────────────────────────────────────────────────────
+  const getLevelStars = useCallback((level: 1 | 2 | 3 | 4): number => {
+    const { percentage } = getLevelProgress(level);
+    if (percentage >= 1.0) return 3;
+    if (percentage >= 0.66) return 2;
+    if (percentage >= 0.33) return 1;
+    return 0;
+  }, [getLevelProgress]);
 
-      // Persist to AsyncStorage (fire-and-wait, errors are swallowed by storage.set)
-      await storage.set(PROGRESS_KEY, newProgress);
-    },
-    [],
-  );
+  // ── selectSentencesForRound ──────────────────────────────────────────────────
+  const selectSentencesForRound = useCallback((level: 1 | 2 | 3 | 4): Sentence[] => {
+    const store = masteryRef.current;
+    const verbs = verbsForLevel(level);
 
-  // ── getLevelProgress ────────────────────────────────────────────────────────
-  const getLevelProgress = useCallback(
-    (level: 1 | 2 | 3 | 4): SubLevelRecord[] => {
-      const levelData = progressRef.current[level.toString()];
-      return SUB_LEVELS.map((subLevel) => ({
-        subLevel,
-        ...getSubLevel(levelData, subLevel),
-      }));
-    },
-    // No deps — reads from ref, safe to be stable
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+    // Bucket verbs into priority groups
+    const wrongUnmastered: string[] = [];
+    const neverSeen:       string[] = [];
+    const stale:           string[] = [];
+    const mastered:        string[] = [];
 
-  // ── isLevelUnlocked ─────────────────────────────────────────────────────────
-  const isLevelUnlocked = useCallback(
-    (level: 1 | 2 | 3 | 4): boolean => {
-      if (level === 1) return true;
-      const prevLevelKey = (level - 1).toString();
-      return isLevelFullyCompleted(progressRef.current[prevLevelKey]);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  // ── getTotalStars ───────────────────────────────────────────────────────────
-  const getTotalStars = useCallback((): number => {
-    let total = 0;
-    for (const levelData of Object.values(progressRef.current)) {
-      if (!levelData) continue;
-      for (const subData of Object.values(levelData)) {
-        if (subData) total += subData.bestStars;
+    for (const verb of verbs) {
+      const m = store[verb];
+      if (!m) {
+        neverSeen.push(verb);
+      } else if (m.mastered) {
+        mastered.push(verb);
+      } else if (m.incorrectCount > 0) {
+        wrongUnmastered.push(verb);
+      } else {
+        stale.push(verb);
       }
     }
-    return total;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Sort stale by lastSeen ascending (oldest first)
+    stale.sort((a, b) => {
+      const da = store[a]?.lastSeen ?? "";
+      const db = store[b]?.lastSeen ?? "";
+      return da < db ? -1 : 1;
+    });
+
+    // Build selection: fill up to ROUND_SIZE, reserve REVIEW_SLOTS for mastered
+    const practiceSlots = ROUND_SIZE - REVIEW_SLOTS;
+    const practicePool  = [
+      ...shuffle(wrongUnmastered),
+      ...shuffle(neverSeen),
+      ...stale,
+    ];
+
+    const selected: string[] = [];
+    for (const verb of practicePool) {
+      if (selected.length >= practiceSlots) break;
+      selected.push(verb);
+    }
+
+    // Fill remaining practice slots with mastered verbs if not enough practice verbs
+    const reviewPool = shuffle(mastered);
+    while (selected.length < practiceSlots && reviewPool.length > 0) {
+      selected.push(reviewPool.pop()!);
+    }
+
+    // Add review slots from mastered (up to REVIEW_SLOTS)
+    let reviewAdded = 0;
+    for (const verb of reviewPool) {
+      if (reviewAdded >= REVIEW_SLOTS) break;
+      if (!selected.includes(verb)) {
+        selected.push(verb);
+        reviewAdded++;
+      }
+    }
+
+    // If still under ROUND_SIZE (small level), pad with any remaining verbs
+    const allVerbs = shuffle(verbs);
+    for (const verb of allVerbs) {
+      if (selected.length >= ROUND_SIZE) break;
+      if (!selected.includes(verb)) selected.push(verb);
+    }
+
+    // Pick one random sentence per selected verb, shuffle final list
+    const sentences: Sentence[] = [];
+    for (const verb of selected) {
+      const s = pickOneSentence(verb, level);
+      if (s) sentences.push(s);
+    }
+
+    return shuffle(sentences);
   }, []);
 
-  // ── resetProgress ───────────────────────────────────────────────────────────
+  // ── resetProgress ────────────────────────────────────────────────────────────
   const resetProgress = useCallback(async (): Promise<void> => {
-    const empty: ProgressData = {};
-    setProgress(empty);
-    progressRef.current = empty;
-    await storage.remove(PROGRESS_KEY);
+    const empty: MasteryStore = {};
+    setMastery(empty);
+    masteryRef.current = empty;
+    unlockedLevelsRef.current = new Set([1]);
+    await Promise.all([storage.remove(MASTERY_KEY), storage.remove(UNLOCKED_KEY)]);
   }, []);
 
-  // ── reloadProgress ──────────────────────────────────────────────────────────
+  // ── reloadProgress ───────────────────────────────────────────────────────────
   const reloadProgress = useCallback(async (): Promise<void> => {
-    const stored = await storage.get<ProgressData>(PROGRESS_KEY);
+    const [stored, storedUnlocked] = await Promise.all([
+      storage.get<MasteryStore>(MASTERY_KEY),
+      storage.get<number[]>(UNLOCKED_KEY),
+    ]);
     const data = stored ?? {};
-    setProgress(data);
-    progressRef.current = data;
+    setMastery(data);
+    masteryRef.current = data;
+    unlockedLevelsRef.current = storedUnlocked ? new Set(storedUnlocked) : new Set([1]);
   }, []);
 
-  // ── Reactive wrappers ───────────────────────────────────────────────────────
-  // getLevelProgress, isLevelUnlocked, getTotalStars all read from progressRef
-  // so they return the latest values without needing re-creation. However, the
-  // calling component won't re-render when progress changes unless it reads
-  // from the `progress` state. The memoized values below provide reactive
-  // alternatives for components that need to re-render on change.
-
-  // (Components can call the stable functions above OR use these reactive memo
-  // values — both are exposed. Using both in the same component is fine.)
-
-  return useMemo(
-    () => ({
-      isLoading,
-      saveRoundResult,
-      getLevelProgress,
-      isLevelUnlocked,
-      getTotalStars,
-      resetProgress,
-      reloadProgress,
-    }),
-    // Only re-create the object when isLoading changes or after a save
-    // (progress state change). The callback refs are stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, progress, saveRoundResult, getLevelProgress, isLevelUnlocked, getTotalStars, resetProgress, reloadProgress],
-  );
+  return useMemo(() => ({
+    isLoading,
+    updateVerbMastery,
+    getVerbMastery,
+    getVerbCounts,
+    getLevelProgress,
+    isLevelUnlocked,
+    getMistakes,
+    getTotalMastered,
+    getLevelStars,
+    selectSentencesForRound,
+    resetProgress,
+    reloadProgress,
+  }), [isLoading, mastery]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -20,7 +20,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef } from "react";
 
-import { useProgress } from "@/hooks/useProgress";
+import { useProgress } from "@/hooks/useProgress"; // for streak only — mastery saved in game screen
 import { useStreak } from "@/hooks/useStreak";
 import { useSound } from "@/hooks/useSound";
 import { consumePendingResult, type PendingRoundResult } from "@/utils/resultsStore";
@@ -154,40 +154,32 @@ export default function ResultsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     level: string;
-    subLevel: string;
     score: string;
     stars: string;
   }>();
 
-  const level    = Math.max(1, Math.min(4, parseInt(params.level    ?? "1", 10))) as 1 | 2 | 3 | 4;
-  const subLevel = Math.max(1, Math.min(5, parseInt(params.subLevel ?? "1", 10))) as 1 | 2 | 3 | 4 | 5;
-  const score    = parseInt(params.score ?? "0", 10);
-  const stars    = parseInt(params.stars ?? "0", 10);
+  const level = Math.max(1, Math.min(4, parseInt(params.level ?? "1", 10))) as 1 | 2 | 3 | 4;
+  const score = parseInt(params.score ?? "0", 10);
+  const stars = parseInt(params.stars ?? "0", 10);
 
   // Consume sentence-level results from the module store (written by game screen)
   const roundRef = useRef<PendingRoundResult | null>(consumePendingResult());
   const sentenceResults: SentenceResult[] = roundRef.current?.results ?? [];
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
-  const { saveRoundResult }  = useProgress();
-  const { bumpStreak }       = useStreak();
+  useProgress(); // keep hook mounted so mastery state stays live
+  const { bumpStreak }        = useStreak();
   const { playLevelComplete } = useSound();
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const isLevelComplete = subLevel === 5 && stars >= 1;
 
   // ── Save once on mount ─────────────────────────────────────────────────────
   const savedRef = useRef(false);
   useEffect(() => {
     if (savedRef.current) return;
     savedRef.current = true;
-    saveRoundResult(level, subLevel, score, stars);
     if (stars >= 1) {
       bumpStreak();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    // Delay gives expo-audio time to finish loading the asset before play() is called.
-    // Play complete sound for any finished round (not just the final subLevel).
     const t = setTimeout(() => playLevelComplete(), 400);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,26 +190,13 @@ export default function ResultsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.replace({
       pathname: "/game/[level]",
-      params: { level: String(level), subLevel: String(subLevel) },
+      params: { level: String(level) },
     });
   };
 
   const handleContinue = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (subLevel < 5) {
-      router.replace({
-        pathname: "/game/[level]",
-        params: { level: String(level), subLevel: String(subLevel + 1) },
-      });
-    } else if (isLevelComplete) {
-      // Pass unlocked=next level so the home screen can play the unlock sound
-      router.replace({
-        pathname: "/",
-        params: level < 4 ? { unlocked: String(level + 1) } : {},
-      });
-    } else {
-      router.replace("/");
-    }
+    router.replace("/");
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -251,21 +230,6 @@ export default function ResultsScreen() {
           </Animated.Text>
         )}
 
-        {/* Level-complete celebration banner */}
-        {isLevelComplete && (
-          <Animated.View
-            entering={FadeInDown.delay(1200).duration(500)}
-            style={S.celebrationCard}
-          >
-            <Text style={S.celebrationIcon}>🏆</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={S.celebrationTitle}>Level {level} abgeschlossen!</Text>
-              <Text style={S.celebrationSub}>
-                {level < 4 ? `Level ${level + 1} ist jetzt freigeschaltet →` : "Du hast alle Level gemeistert!"}
-              </Text>
-            </View>
-          </Animated.View>
-        )}
       </View>
 
       {/* ── Sentence list ── */}
@@ -287,7 +251,7 @@ export default function ResultsScreen() {
 
       {/* ── Bottom buttons ── */}
       <View style={S.bottomBar}>
-        {/* Nochmal — retry same subLevel */}
+        {/* Nochmal — retry same level */}
         <Pressable
           onPress={handleRetry}
           style={[S.btn, S.btnOutline]}
@@ -297,16 +261,14 @@ export default function ResultsScreen() {
           <Text style={[S.btnText, { color: C.gold }]}>Nochmal</Text>
         </Pressable>
 
-        {/* Weiter — next subLevel or home */}
+        {/* Weiter — back to home */}
         <Pressable
           onPress={handleContinue}
           style={[S.btn, S.btnFilled]}
           accessibilityRole="button"
-          accessibilityLabel={subLevel < 5 ? "Zur nächsten Stufe" : "Zum Hauptmenü"}
+          accessibilityLabel="Zum Hauptmenü"
         >
-          <Text style={[S.btnText, { color: C.bg }]}>
-            {subLevel < 5 ? "Weiter →" : "Fertig ✓"}
-          </Text>
+          <Text style={[S.btnText, { color: C.bg }]}>Fertig ✓</Text>
         </Pressable>
       </View>
     </SafeAreaView>
