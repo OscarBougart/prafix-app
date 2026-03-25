@@ -6,19 +6,14 @@ import {
   StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withSequence,
-  withDelay,
   FadeIn,
   FadeInDown,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useProgress } from "@/hooks/useProgress"; // for streak only — mastery saved in game screen
 import { useStreak } from "@/hooks/useStreak";
@@ -43,6 +38,57 @@ const C = {
   muted:       "#AFAFAF",
 } as const;
 
+// ─── Score quotes ─────────────────────────────────────────────────────────────
+
+const QUOTES: Record<"terrible" | "bad" | "okay" | "good" | "perfect", string[]> = {
+  terrible: [
+    "Noch viel Luft nach oben!",
+    "Das wird noch!",
+    "Übung macht den Meister.",
+    "Nicht aufgeben!",
+    "Jeder fängt mal klein an.",
+  ],
+  bad: [
+    "Du kommst näher!",
+    "Weiter so, du schaffst das!",
+    "Noch ein bisschen üben.",
+    "Fast dabei!",
+    "Nicht schlecht für den Anfang.",
+  ],
+  okay: [
+    "Solide! Weiter üben.",
+    "Ganz okay — du wirst besser!",
+    "Mittelmäßig, aber auf dem Weg.",
+    "Halbzeit! Jetzt richtig loslegen.",
+    "Du bist auf dem richtigen Weg.",
+  ],
+  good: [
+    "Sehr gut gemacht!",
+    "Stark! Fast perfekt.",
+    "Beeindruckend!",
+    "Du kennst deine Präfixe.",
+    "Fast makellos!",
+  ],
+  perfect: [
+    "Perfekte Runde!",
+    "Unglaublich! Alles richtig.",
+    "Meisterhaft!",
+    "Fehlerlos — Respekt!",
+    "Du bist ein Präfix-Profi!",
+  ],
+};
+
+function getQuote(score: number): string {
+  const tier =
+    score === 10 ? "perfect" :
+    score >= 8   ? "good" :
+    score >= 5   ? "okay" :
+    score >= 3   ? "bad" :
+                   "terrible";
+  const pool = QUOTES[tier];
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Reconstruct the full correct sentence by filling all blanks. */
@@ -62,52 +108,6 @@ function buildCorrectSentence(sentence: Sentence): string {
   return (parts[0] ?? "") + sentence.correctPrefix + (parts[1] ?? "");
 }
 
-// ─── AnimatedStar ─────────────────────────────────────────────────────────────
-
-interface AnimatedStarProps {
-  filled: boolean;
-  delay: number; // ms before the pop animation starts
-}
-
-function AnimatedStar({ filled, delay }: AnimatedStarProps) {
-  const scale = useSharedValue(filled ? 0.1 : 1);
-  const glowOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (filled) {
-      scale.value = withDelay(
-        delay,
-        withSequence(
-          withSpring(1.5, { damping: 6, stiffness: 500 }),
-          withSpring(1.0, { damping: 14, stiffness: 250 }),
-        ),
-      );
-      glowOpacity.value = withDelay(delay, withTiming(0.5, { duration: 350 }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const scaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
-
-  return (
-    <View style={S.starWrapper}>
-      {/* Gold glow halo behind the star */}
-      <Animated.View style={[S.starGlow, glowStyle]} />
-      {/* Star character */}
-      <Animated.Text
-        style={[S.starChar, { color: filled ? C.gold : C.border }, scaleStyle]}
-      >
-        ★
-      </Animated.Text>
-    </View>
-  );
-}
 
 // ─── SentenceRow ──────────────────────────────────────────────────────────────
 
@@ -123,12 +123,14 @@ function SentenceRow({ result, index }: SentenceRowProps) {
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 45).duration(320)}
-      style={[S.sentenceRow, { borderLeftColor: correct ? C.correct : C.wrong }]}
+      style={S.sentenceRow}
     >
-      {/* ✓ / ✗ icon */}
-      <View style={[S.iconBadge, { backgroundColor: correct ? C.correct : C.wrong }]}>
-        <Text style={S.iconText}>{correct ? "✓" : "✗"}</Text>
-      </View>
+      {/* ✓ icon — only when correct */}
+      {correct && (
+        <View style={[S.iconBadge, { backgroundColor: C.correct, alignSelf: "center" }]}>
+          <Text style={S.iconText}>✓</Text>
+        </View>
+      )}
 
       {/* Text block */}
       <View style={{ flex: 1 }}>
@@ -165,6 +167,7 @@ export default function ResultsScreen() {
   // Consume sentence-level results from the module store (written by game screen)
   const roundRef = useRef<PendingRoundResult | null>(consumePendingResult());
   const sentenceResults: SentenceResult[] = roundRef.current?.results ?? [];
+  const quote = useRef(getQuote(score)).current;
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
   useProgress(); // keep hook mounted so mastery state stays live
@@ -185,6 +188,9 @@ export default function ResultsScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [retryPressed, setRetryPressed]       = useState(false);
+  const [continuePressed, setContinuePressed] = useState(false);
+
   // ── Navigation ─────────────────────────────────────────────────────────────
   const handleRetry = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -204,31 +210,20 @@ export default function ResultsScreen() {
     <SafeAreaView style={S.root} edges={["top", "bottom"]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* ── Header: score + stars ── */}
+      {/* ── Header: score + quote ── */}
       <View style={S.header}>
 
-        {/* Numeric score */}
         <Animated.View entering={FadeIn.duration(400)} style={S.scoreRow}>
           <Text style={S.scoreMain}>{score}</Text>
           <Text style={S.scoreDenom}> / 10</Text>
         </Animated.View>
 
-        {/* Animated stars */}
-        <Animated.View entering={FadeIn.delay(100).duration(400)} style={S.starsRow}>
-          <AnimatedStar filled={stars >= 1} delay={300} />
-          <AnimatedStar filled={stars >= 2} delay={600} />
-          <AnimatedStar filled={stars >= 3} delay={900} />
-        </Animated.View>
-
-        {/* 0-star encouragement */}
-        {stars === 0 && (
-          <Animated.Text
-            entering={FadeInDown.delay(600).duration(400)}
-            style={S.retryMsg}
-          >
-            Versuch es nochmal! 💪
-          </Animated.Text>
-        )}
+        <Animated.Text
+          entering={FadeInDown.delay(300).duration(400)}
+          style={S.quoteText}
+        >
+          {quote}
+        </Animated.Text>
 
       </View>
 
@@ -238,25 +233,36 @@ export default function ResultsScreen() {
         contentContainerStyle={S.listContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={S.listLabel}>ERGEBNISSE</Text>
+        <View style={S.outerCard}>
+          <Text style={S.listLabel}>Ergebnisse</Text>
 
-        {sentenceResults.map((result, i) => (
-          <SentenceRow key={result.sentence.id} result={result} index={i} />
-        ))}
+          {sentenceResults.map((result, i) => (
+            <SentenceRow key={result.sentence.id} result={result} index={i} />
+          ))}
 
-        {sentenceResults.length === 0 && (
-          <Text style={S.emptyMsg}>Keine Daten verfügbar.</Text>
-        )}
+          {sentenceResults.length === 0 && (
+            <Text style={S.emptyMsg}>Keine Daten verfügbar.</Text>
+          )}
+        </View>
       </ScrollView>
 
       {/* ── Bottom buttons ── */}
-      <View style={S.bottomBar}>
+      <Animated.View entering={FadeIn.delay(200).duration(600)} style={S.bottomBar}>
+      <BlurView intensity={8} tint="dark" style={StyleSheet.absoluteFill} />
         {/* Nochmal — retry same level */}
         <Pressable
           onPress={handleRetry}
-          style={[S.btn, S.btnOutline]}
+          onPressIn={() => setRetryPressed(true)}
+          onPressOut={() => setRetryPressed(false)}
           accessibilityRole="button"
           accessibilityLabel="Nochmal spielen"
+          style={[S.btn, S.btnOutline, {
+            borderBottomWidth: retryPressed ? 0 : 4,
+            borderLeftWidth: retryPressed ? 0 : 1.5,
+            borderRightWidth: retryPressed ? 0 : 1.5,
+            borderTopWidth: 0,
+            transform: [{ translateY: retryPressed ? 4 : 0 }],
+          }]}
         >
           <Text style={[S.btnText, { color: C.gold }]}>Nochmal</Text>
         </Pressable>
@@ -264,13 +270,21 @@ export default function ResultsScreen() {
         {/* Weiter — back to home */}
         <Pressable
           onPress={handleContinue}
-          style={[S.btn, S.btnFilled]}
+          onPressIn={() => setContinuePressed(true)}
+          onPressOut={() => setContinuePressed(false)}
           accessibilityRole="button"
           accessibilityLabel="Zum Hauptmenü"
+          style={[S.btn, S.btnFilled, {
+            borderBottomWidth: continuePressed ? 0 : 4,
+            borderLeftWidth: continuePressed ? 0 : 1.5,
+            borderRightWidth: continuePressed ? 0 : 1.5,
+            borderTopWidth: 0,
+            transform: [{ translateY: continuePressed ? 4 : 0 }],
+          }]}
         >
-          <Text style={[S.btnText, { color: C.bg }]}>Fertig ✓</Text>
+          <Text style={[S.btnText, { color: C.bg }]}>Fertig</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -289,8 +303,7 @@ const S = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomWidth: 0,
   },
   scoreRow: {
     flexDirection: "row",
@@ -308,33 +321,12 @@ const S = StyleSheet.create({
     fontSize: 34,
     color: C.muted,
   },
-  starsRow: {
-    flexDirection: "row",
-    gap: 4,
-    marginBottom: 4,
-  },
-  starWrapper: {
-    width: 76,
-    height: 76,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  starGlow: {
-    position: "absolute",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: C.gold,
-  },
-  starChar: {
-    fontSize: 50,
-    lineHeight: 56,
-  },
-  retryMsg: {
+  quoteText: {
     fontFamily: "Nunito_700Bold",
-    color: C.muted,
-    fontSize: 15,
-    marginTop: 10,
+    color: C.gold,
+    fontSize: 16,
+    marginTop: -2,
+    textAlign: "center",
   },
 
   // ── Celebration banner ──
@@ -369,25 +361,30 @@ const S = StyleSheet.create({
 
   // ── Sentence list ──
   listContent: {
-    padding: 20,
-    paddingBottom: 16,
+    padding: 16,
+    paddingBottom: 100,
+  },
+  outerCard: {
+    backgroundColor: C.surface,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   listLabel: {
     fontFamily: "Nunito_700Bold",
-    color: C.muted,
-    fontSize: 11,
-    letterSpacing: 1.4,
+    color: C.foreground,
+    fontSize: 15,
     marginBottom: 14,
   },
   sentenceRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: C.surface,
+    backgroundColor: C.bg,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 10,
-    borderLeftWidth: 3,
+    marginBottom: 8,
   },
   iconBadge: {
     width: 26,
@@ -395,7 +392,6 @@ const S = StyleSheet.create({
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
     flexShrink: 0,
   },
   iconText: {
@@ -427,13 +423,15 @@ const S = StyleSheet.create({
 
   // ── Bottom bar ──
   bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     gap: 12,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
+    paddingVertical: 16,
+    backgroundColor: "transparent",
   },
   btn: {
     flex: 1,
@@ -441,17 +439,15 @@ const S = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: 4,
   },
   btnFilled: {
     backgroundColor: C.gold,
-    borderBottomColor: C.goldDark,
+    borderColor: C.goldDark,
   },
   btnOutline: {
     backgroundColor: C.surface,
-    borderBottomColor: C.border,
-    borderWidth: 1.5,
     borderColor: C.gold,
+    borderBottomColor: C.goldDark,
   },
   btnText: {
     fontFamily: "Nunito_700Bold",

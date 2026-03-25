@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,8 +25,11 @@ import { useProgress } from "@/hooks/useProgress";
 import { useSound } from "@/hooks/useSound";
 import { useFavorites } from "@/hooks/useFavorites";
 import { setPendingResult } from "@/utils/resultsStore";
+import { storage } from "@/utils/storage";
 import { allSentences } from "@/data/sentences";
 import type { Sentence } from "@/data/types";
+
+const KEYBOARD_MODE_KEY = "prafix:keyboard_mode";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -103,6 +107,7 @@ interface OptionButtonProps {
 
 function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps) {
   const shakeX = useSharedValue(0);
+  const [pressed, setPressed] = useState(false);
 
   useEffect(() => {
     if (btnState === "wrong") {
@@ -137,9 +142,22 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={`${option} strich`}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         style={[
           S.optionBtn,
-          { backgroundColor: bgColor, borderBottomColor: borderColor, opacity },
+          {
+            backgroundColor: bgColor,
+            borderBottomColor: borderColor,
+            borderLeftColor: borderColor,
+            borderRightColor: borderColor,
+            borderTopWidth: 0,
+            borderBottomWidth: pressed ? 0 : 4,
+            borderLeftWidth: pressed ? 0 : 1.5,
+            borderRightWidth: pressed ? 0 : 1.5,
+            transform: [{ translateY: pressed ? 4 : 0 }],
+            opacity,
+          },
         ]}
       >
         <Text style={[S.optionBtnText, { color: labelColor }]}>{option}</Text>
@@ -153,28 +171,34 @@ function OptionButton({ option, btnState, onPress, disabled }: OptionButtonProps
 interface SentenceDisplayProps {
   sentence: Sentence;
   answer: AnswerState;
+  typedAnswer?: string;
+  showCorrection?: boolean;
 }
 
-function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
+function SentenceDisplay({ sentence, answer, typedAnswer = "", showCorrection = false }: SentenceDisplayProps) {
   const parts = sentence.template.split("_____");
 
-  const blankText =
-    answer.phase === "idle"
-      ? " ___ "
-      : ` ${answer.selectedPrefix} `;
+  const displayText =
+    answer.phase === "answering"
+      ? answer.selectedPrefix
+      : typedAnswer;
 
-  const blankColor =
-    answer.phase === "idle"
-      ? C.blankColor
-      : answer.isCorrect
-      ? C.correct
-      : C.wrong;
+  const underlineColor =
+    answer.phase === "answering"
+      ? answer.isCorrect ? C.correct : C.wrong
+      : C.blue;
 
   const blankNode = (
-    <Text style={{ fontFamily: "Nunito_700Bold", color: blankColor, fontSize: 20 }}>
-      {blankText}
+    <Text style={{ fontFamily: "Nunito_700Bold", color: underlineColor, fontSize: 20, textDecorationLine: "underline", textDecorationColor: underlineColor }}>
+      {displayText.length > 0 ? ` ${displayText} ` : `  \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  `}
     </Text>
   );
+
+  const correctionNode = showCorrection ? (
+    <Text style={{ fontFamily: "Nunito_700Bold", color: C.correct, fontSize: 20 }}>
+      {` ${sentence.correctPrefix}`}
+    </Text>
+  ) : null;
 
   if (sentence.tense === "praesens") {
     return (
@@ -184,6 +208,7 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
         {parts[1]}
         {blankNode}
         {parts[2]}
+        {correctionNode}
       </Text>
     );
   }
@@ -193,6 +218,7 @@ function SentenceDisplay({ sentence, answer }: SentenceDisplayProps) {
       {parts[0]}
       {blankNode}
       <Text style={S.stemChipText}>{parts[1]}</Text>
+      {correctionNode}
     </Text>
   );
 }
@@ -259,6 +285,35 @@ function GameRound({ level, sentences, trackMastery }: GameRoundProps) {
     setShowTranslation(false);
   }, [currentSentence?.id]);
 
+  // ── Keyboard mode ────────────────────────────────────────────────────────────
+  const [keyboardMode, setKeyboardMode] = useState(false);
+  const [typedAnswer, setTypedAnswer]   = useState("");
+  const [caseWarning, setCaseWarning]   = useState(false);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    storage.get<boolean>(KEYBOARD_MODE_KEY).then((val) => {
+      if (val !== null) setKeyboardMode(val);
+    });
+  }, []);
+
+  const toggleKeyboardMode = useCallback(() => {
+    setKeyboardMode((prev) => {
+      const next = !prev;
+      storage.set(KEYBOARD_MODE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  // Reset input on new sentence
+  useEffect(() => {
+    setTypedAnswer("");
+    setCaseWarning(false);
+    if (keyboardMode) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [currentSentence?.id]);
+
   // ── Progress bar ────────────────────────────────────────────────────────────
   const progressAnim = useSharedValue(0);
   useEffect(() => {
@@ -274,6 +329,48 @@ function GameRound({ level, sentences, trackMastery }: GameRoundProps) {
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: cardScale.value }],
   }));
+
+  const handleTypedSubmit = useCallback(() => {
+    if (!currentSentence || answer.phase === "answering") {
+      if (answer.phase === "answering") {
+        submitAnswer(answer.selectedPrefix);
+        setAnswer(IDLE);
+        setTypedAnswer("");
+        setCaseWarning(false);
+      }
+      return;
+    }
+
+    const trimmed = typedAnswer.trim();
+    if (trimmed === "") return;
+
+    const exact = trimmed === currentSentence.correctPrefix;
+    const caseOnly = !exact && trimmed.toLowerCase() === currentSentence.correctPrefix.toLowerCase();
+    const correct = exact || caseOnly;
+
+    setCaseWarning(caseOnly);
+
+    setAnswer({
+      phase: "answering",
+      selectedPrefix: trimmed,
+      isCorrect: correct,
+      correctPrefix: currentSentence.correctPrefix,
+    });
+
+    if (correct) { playCorrect(); } else { playWrong(); }
+    Haptics.notificationAsync(
+      correct
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error,
+    );
+
+    if (correct) {
+      cardScale.value = withSequence(
+        withTiming(1.03, { duration: 110 }),
+        withSpring(1, { damping: 14, stiffness: 250 }),
+      );
+    }
+  }, [currentSentence, answer, typedAnswer, submitAnswer, cardScale, playCorrect, playWrong]);
 
   // ── Navigate when finished ───────────────────────────────────────────────────
   useEffect(() => {
@@ -378,8 +475,20 @@ function GameRound({ level, sentences, trackMastery }: GameRoundProps) {
             )}
           </View>
 
+          {/* Case warning — shown when correct but wrong capitalization */}
+          {keyboardMode && isAnswering && caseWarning && (
+            <View style={S.caseWarningRow}>
+              <Text style={S.caseWarningText}>Groß-/Kleinschreibung beachten</Text>
+            </View>
+          )}
+
           <Animated.View style={[S.sentenceCard, cardStyle]}>
-            <SentenceDisplay sentence={displayedSentence} answer={answer} />
+            <SentenceDisplay
+              sentence={displayedSentence}
+              answer={answer}
+              typedAnswer={keyboardMode ? typedAnswer : ""}
+              showCorrection={keyboardMode && isAnswering && !answer.isCorrect}
+            />
           </Animated.View>
 
           <View style={S.translationRow}>
@@ -394,36 +503,105 @@ function GameRound({ level, sentences, trackMastery }: GameRoundProps) {
             >
               <MaterialIcons name="translate" size={24} color={showTranslation ? C.blue : C.muted} />
             </Pressable>
+            <Pressable
+              onPress={toggleKeyboardMode}
+              accessibilityRole="button"
+              accessibilityLabel="Tastatur umschalten"
+              hitSlop={8}
+            >
+              <MaterialIcons name="keyboard-alt" size={24} color={keyboardMode ? C.blue : C.muted} />
+            </Pressable>
           </View>
 
         </Animated.View>
       </View>
 
-      {/* ── Option buttons (2×2 grid) ── */}
-      <View style={[S.optionsContainer, { paddingHorizontal: H_PAD }]}>
-        <View style={S.optionRow}>
-          {options.slice(0, 2).map((opt, i) => (
-            <OptionButton
-              key={i}
-              option={opt}
-              btnState={getBtnState(opt, answer)}
-              onPress={() => handleOptionPress(opt)}
-              disabled={opt === ""}
+      {keyboardMode ? (
+        /* ── Keyboard input ── */
+        <Pressable
+          style={[S.optionsContainer, { paddingHorizontal: H_PAD }]}
+          onPress={() => {
+            if (isAnswering) {
+              submitAnswer(answer.selectedPrefix);
+              setAnswer(IDLE);
+              setTypedAnswer("");
+              setCaseWarning(false);
+            }
+          }}
+        >
+          <View style={[S.keyboardInputRow, {
+            borderColor: isAnswering
+              ? answer.isCorrect ? C.correct : C.wrong
+              : C.border,
+          }]}>
+            <TextInput
+              ref={inputRef}
+              value={isAnswering ? answer.selectedPrefix : typedAnswer}
+              onChangeText={isAnswering ? undefined : setTypedAnswer}
+              editable={!isAnswering}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleTypedSubmit}
+              placeholder="Präfix eingeben…"
+              placeholderTextColor={C.muted}
+              style={[S.keyboardInput, {
+                color: isAnswering
+                  ? answer.isCorrect ? C.correct : C.wrong
+                  : C.foreground,
+              }]}
             />
-          ))}
+          </View>
+          <Pressable
+            onPress={isAnswering ? () => {
+              submitAnswer(answer.selectedPrefix);
+              setAnswer(IDLE);
+              setTypedAnswer("");
+              setCaseWarning(false);
+            } : handleTypedSubmit}
+            style={[S.pruefenBtn, {
+              backgroundColor: isAnswering
+                ? answer.isCorrect ? C.correct : C.wrong
+                : C.btnYellow,
+              borderBottomColor: isAnswering
+                ? answer.isCorrect ? C.correctDark : C.wrongDark
+                : C.btnYellowDk,
+            }]}
+          >
+            <Text style={[S.pruefenBtnText, {
+              color: isAnswering ? C.foreground : C.bg,
+            }]}>
+              {isAnswering ? "Weiter →" : "Prüfen"}
+            </Text>
+          </Pressable>
+        </Pressable>
+      ) : (
+        /* ── Option buttons (2×2 grid) ── */
+        <View style={[S.optionsContainer, { paddingHorizontal: H_PAD }]}>
+          <View style={S.optionRow}>
+            {options.slice(0, 2).map((opt, i) => (
+              <OptionButton
+                key={i}
+                option={opt}
+                btnState={getBtnState(opt, answer)}
+                onPress={() => handleOptionPress(opt)}
+                disabled={opt === ""}
+              />
+            ))}
+          </View>
+          <View style={S.optionRow}>
+            {options.slice(2, 4).map((opt, i) => (
+              <OptionButton
+                key={i + 2}
+                option={opt}
+                btnState={getBtnState(opt, answer)}
+                onPress={() => handleOptionPress(opt)}
+                disabled={opt === ""}
+              />
+            ))}
+          </View>
         </View>
-        <View style={S.optionRow}>
-          {options.slice(2, 4).map((opt, i) => (
-            <OptionButton
-              key={i + 2}
-              option={opt}
-              btnState={getBtnState(opt, answer)}
-              onPress={() => handleOptionPress(opt)}
-              disabled={opt === ""}
-            />
-          ))}
-        </View>
-      </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -536,12 +714,12 @@ const S = StyleSheet.create({
   },
   progressShine: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "50%",
+    top: "20%",
+    left: 6,
+    right: 6,
+    height: "18%",
     borderRadius: 99,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   scoreBadge: {
     width: SCORE_W,
@@ -606,7 +784,7 @@ const S = StyleSheet.create({
   },
   translationRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "flex-end",
     gap: 10,
     marginTop: 8,
@@ -640,11 +818,64 @@ const S = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: 4,
   },
   optionBtnText: {
     fontFamily: "Nunito_700Bold",
     fontSize: 17,
     letterSpacing: 0.2,
+  },
+
+  // ── Keyboard mode ──
+  wrongFeedbackRow: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: C.wrong,
+  },
+  wrongFeedbackText: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 15,
+    color: C.muted,
+  },
+  caseWarningRow: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  caseWarningText: {
+    fontFamily: "Nunito_400Regular",
+    fontSize: 11,
+    color: C.wrong,
+  },
+  keyboardInputRow: {
+    borderWidth: 2,
+    borderRadius: 14,
+    backgroundColor: C.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  keyboardInput: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 20,
+    height: 52,
+  },
+  pruefenBtn: {
+    height: 64,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomWidth: 4,
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderTopWidth: 0,
+  },
+  pruefenBtnText: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 17,
+    letterSpacing: 0.3,
   },
 });
